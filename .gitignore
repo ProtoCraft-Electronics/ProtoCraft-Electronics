@@ -53,3 +53,37 @@ dkms.conf
 
 # debug information files
 *.dwo
+# ESP-IDF specific
+build/
+dependencies.lock
+managed_components/
+sdkconfig.old
+*.map
+*.bin
+*.elf
+*.hex
+
+# Arduino specific
+*.hex
+*.elf
+
+# KiCad
+*.bak
+*.kicad_pcb-bak
+fp-info-cache
+
+# macOS
+.DS_Store
+
+# VS Code
+.vscode/
+
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# Office files (keep PDFs, ignore temp files)
+~$*.xlsx
+~$*.docx
