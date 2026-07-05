@@ -36,4 +36,4 @@ schematic, so there is no `hardware/` folder for this project.
 
 ## 📺 Video
 
-Part of the [ProtoCraft Electronics](https://www.youtube.com/@ProtoCraftElectronics) YouTube channel.
+Part of the [ProtoCraft Electronics](https://www.youtube.com/channel/UCBnjPIkKBEFrhlGcf1cxJmw?sub_confirmation=1) YouTube channel.
