@@ -1,6 +1,7 @@
 # GPIO_Switch_00 — ESP32 Internal Pull-up Example
 
-Part of the [ProtoCraft Electronics](https://www.youtube.com/@ProtocraftElectronics) tutorial series.
+Part of the [ProtoCraft Electronics](https://www.youtube.com/channel/UCBnjPIkKBEFrhlGcf1cxJmw?sub_confirmation=1) tutorial series.
+Watch: https://youtu.be/KdGEu-vdHNI
 
 ## What it does
 

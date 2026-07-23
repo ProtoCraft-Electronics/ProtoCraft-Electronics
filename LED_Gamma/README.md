@@ -1,8 +1,8 @@
 # LED Gamma Correction — ESP32
 
-**ProtoCraft Electronics** · [youtube.com/@ProtoCraftElectronics](https://youtube.com/@ProtoCraftElectronics)
+**ProtoCraft Electronics** · [youtube.com/@ProtoCraftElectronics](https://www.youtube.com/channel/UCBnjPIkKBEFrhlGcf1cxJmw?sub_confirmation=1)
 
-> **Watch the full video:** [Why your LED fade looks broken — Gamma correction explained using ESP32](https://youtube.com/@ProtoCraftElectronics)
+> **Watch the full video:** [Why your LED fade looks broken — Gamma correction explained using ESP32](https://youtu.be/eCLPZqBViC4)
 
 ---
 

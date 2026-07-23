@@ -1,6 +1,6 @@
 // =============================================================================
 //  LED_Gamma.ino
-//  ProtoCraft Electronics — youtube.com/@ProtoCraftElectronics
+//  ProtoCraft Electronics — youtu.be/eCLPZqBViC4
 // =============================================================================
 //
 //  Demonstrates the visible difference between:

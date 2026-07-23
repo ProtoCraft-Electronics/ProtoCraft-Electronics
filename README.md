@@ -1,7 +1,7 @@
 # ProtoCraft Electronics — Project Repository
 
 Code, schematics, PCB designs, and hardware resources for every video on the
-[ProtoCraft Electronics](https://www.youtube.com/@ProtoCraftElectronics) YouTube channel.
+[ProtoCraft Electronics](https://www.youtube.com/channel/UCBnjPIkKBEFrhlGcf1cxJmw?sub_confirmation=1) YouTube channel.
 Built by a professional hardware design engineer with 13 years of real-world experience
 across digital, analog, high-speed, and power supply domains.
 
@@ -57,7 +57,7 @@ Each project folder contains:
 
 ## 📺 YouTube Channel
 
-[youtube.com/@ProtoCraftElectronics](https://www.youtube.com/@ProtoCraftElectronics)
+[youtube.com/@ProtoCraftElectronics](https://www.youtube.com/channel/UCBnjPIkKBEFrhlGcf1cxJmw?sub_confirmation=1)
 
 New videos covering ESP32 projects, PCB design, power supply design,
 and real-world professional hardware engineering.
