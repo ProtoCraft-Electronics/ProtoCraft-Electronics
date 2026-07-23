@@ -77,6 +77,6 @@ password, ideally HTTPS or a BLE-based config flow instead of open HTTP.
 ## 📺 Video
 
 Part 3 of the ESP-NOW mini-series on the
-[ProtoCraft Electronics](https://www.youtube.com/@ProtoCraftElectronics) YouTube channel.
+[ProtoCraft Electronics](https://www.youtube.com/channel/UCBnjPIkKBEFrhlGcf1cxJmw?sub_confirmation=1) YouTube channel.
 Part 1 (broadcast): `ESP32-Projects/ESP-NOW-Example/`
 Part 2 (unicast): `ESP32-Projects/ESP-NOW-Unicast/`

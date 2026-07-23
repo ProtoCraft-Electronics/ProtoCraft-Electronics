@@ -59,6 +59,6 @@ so there is no `hardware/` folder for this project.
 ## 📺 Video
 
 Part 2 of the ESP-NOW mini-series on the
-[ProtoCraft Electronics](https://www.youtube.com/@ProtoCraftElectronics) YouTube channel.
+[ProtoCraft Electronics](https://www.youtube.com/channel/UCBnjPIkKBEFrhlGcf1cxJmw?sub_confirmation=1) YouTube channel.
 Watch: https://youtu.be/o7l_a4yrzts
 Part 1 (broadcast) is at `ESP32-Projects/ESP-NOW-Example/`.
