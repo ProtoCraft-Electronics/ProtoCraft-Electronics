@@ -90,3 +90,13 @@ venv/
 
 # Local-only, not for the public repo
 CLAUDE.md
+
+# Video production/planning files, not for the public repo
+script.md
+shot_list.md
+shorts_plan.md
+thumbnail_brief.md
+metadata.md
+
+# Real credentials for firmware sketches — copy from secrets.h.example
+secrets.h
