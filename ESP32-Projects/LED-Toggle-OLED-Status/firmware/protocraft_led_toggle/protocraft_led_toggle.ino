@@ -2,7 +2,7 @@
  * ProtoCraft Electronics — LED Toggle with OLED Status
  * -----------------------------------------------------
  * Board:    ESP32 Dev Kit (any variant with an onboard LED)
- * Display:  1.3" OLED, SH1106 driver, I2C (128x64)
+ * Display:  1.3" OLED, SSD1306 driver, I2C (128x64)
  *           (same display/library used in the LoRa display demo)
  * Switch:   Momentary push button on GPIO 4 -> GND (INPUT_PULLUP)
  *
@@ -16,7 +16,7 @@
  *
  * Libraries required (Library Manager):
  *   - Adafruit GFX Library
- *   - Adafruit SH110X
+ *   - Adafruit SSD1306
  *
  * Wiring:
  *   OLED VCC -> 3V3        OLED GND -> GND
@@ -26,16 +26,16 @@
 
 #include <Wire.h>
 #include <Adafruit_GFX.h>
-#include <Adafruit_SH110X.h>
+#include <Adafruit_SSD1306.h>
 #include "icon_bitmap.h"   // ProtoCraft Electronics chip-icon (32x32, 1-bit) — generated from the channel logo PNG
 
 // ---------- Display config ----------
 #define SCREEN_WIDTH   128
 #define SCREEN_HEIGHT  64
 #define OLED_RESET     -1      // No dedicated reset pin (shared with ESP32 reset)
-#define OLED_I2C_ADDR  0x3C    // Common address for 1.3" SH1106 modules; use 0x3D if that doesn't work
+#define OLED_I2C_ADDR  0x3C    // Common address for 1.3" SSD1306 modules; use 0x3D if that doesn't work
 
-Adafruit_SH1106G display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 // ---------- Pin config ----------
 const uint8_t LED_PIN    = LED_BUILTIN;  // Onboard LED. If your board reports no onboard LED,
@@ -66,12 +66,12 @@ void setup() {
   pinMode(BUTTON_PIN, INPUT_PULLUP);
 
   // Init OLED
-  if (!display.begin(OLED_I2C_ADDR, true)) {
-    Serial.println(F("SH1106 allocation failed — check wiring/I2C address"));
+  if (!display.begin(SSD1306_SWITCHCAPVCC, OLED_I2C_ADDR)) {
+    Serial.println(F("SSD1306 allocation failed — check wiring/I2C address"));
     // Keep going: LED toggle still works even without the display.
   } else {
     display.clearDisplay();
-    display.setTextColor(SH110X_WHITE);
+    display.setTextColor(SSD1306_WHITE);
     showBootScreen();
     delay(BOOT_SPLASH_MS); // One-time blocking delay is fine here — happens once at boot only
     drawLedStatus();
@@ -113,7 +113,7 @@ void showBootScreen() {
   display.clearDisplay();
 
   // Channel logo icon (chip outline), centered horizontally at the top
-  display.drawBitmap((SCREEN_WIDTH - LOGO_W) / 2, 0, logo_bmp, LOGO_W, LOGO_H, SH110X_WHITE);
+  display.drawBitmap((SCREEN_WIDTH - LOGO_W) / 2, 0, logo_bmp, LOGO_W, LOGO_H, SSD1306_WHITE);
 
   // Wordmark below the icon
   display.setTextSize(2);
@@ -133,7 +133,7 @@ void drawLedStatus() {
   display.setTextSize(1);
   display.setCursor(0, 0);
   display.println(F("ProtoCraft Electronics"));
-  display.drawLine(0, 10, 128, 10, SH110X_WHITE);
+  display.drawLine(0, 10, 128, 10, SSD1306_WHITE);
 
   display.setTextSize(2);
   display.setCursor(10, 26);
