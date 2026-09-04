@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Set up your climate monitor</title>
+<style>
+  :root{
+    --ink:#241B3A;
+    --ink-soft:#5B5470;
+    --ink-faint:#9C96AD;
+    --card:#FFFFFF;
+    --border:#E7E1F5;
+    --accent:#8B5CF6;
+    --accent-soft:#F1EBFE;
+    --good:#0F9D6C;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color:var(--ink);
+    min-height:100vh;
+    background:
+      radial-gradient(circle at 20% 10%, #FFE8D6 0%, transparent 45%),
+      radial-gradient(circle at 90% 90%, #D2ECFB 0%, transparent 50%),
+      #FFF8F0;
+    display:flex;
+    align-items:flex-start;
+    justify-content:center;
+    padding:32px 16px;
+  }
+  .card{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:20px;
+    padding:24px;
+    max-width:400px;
+    width:100%;
+    box-shadow:0 10px 30px rgba(90,60,150,0.08);
+  }
+  h1{font-size:19px; margin-bottom:4px;}
+  p.sub{font-size:13px; color:var(--ink-soft); margin-bottom:20px; line-height:1.5;}
+  .field{margin-bottom:14px;}
+  label{display:block; font-size:12.5px; font-weight:600; color:var(--ink-soft); margin-bottom:6px;}
+  input[type=text], input[type=password]{
+    width:100%;
+    padding:11px 12px;
+    border:1px solid var(--border);
+    border-radius:10px;
+    font-size:14px;
+    color:var(--ink);
+  }
+  input:focus{outline:2px solid var(--accent); outline-offset:1px;}
+  #networks{margin-bottom:16px; max-height:180px; overflow-y:auto; border:1px solid var(--border); border-radius:10px;}
+  .net{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:10px 12px; font-size:13.5px; cursor:pointer;
+    border-bottom:1px solid var(--border);
+  }
+  .net:last-child{border-bottom:none;}
+  .net:hover{background:var(--accent-soft);}
+  .net-name{display:flex; align-items:center; gap:6px;}
+  .net-signal{font-size:11px; color:var(--ink-faint);}
+  #scanStatus{font-size:12.5px; color:var(--ink-faint); padding:10px 12px;}
+  button{
+    width:100%;
+    padding:12px;
+    border:none;
+    border-radius:10px;
+    background:var(--accent);
+    color:#fff;
+    font-size:14px;
+    font-weight:600;
+    cursor:pointer;
+  }
+  button:disabled{opacity:0.6;}
+  #status{margin-top:14px; font-size:13px; text-align:center; min-height:18px;}
+  .status-ok{color:var(--good);}
+  .status-err{color:#C22E2E;}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>Set up your climate monitor</h1>
+  <p class="sub">Pick your WiFi network and enter the password. The device will restart and join it, then be reachable at <strong>climate.local</strong> on that network.</p>
+
+  <div id="networks"><div id="scanStatus">Scanning for networks…</div></div>
+
+  <form id="wifiForm">
+    <div class="field">
+      <label for="ssid">Network name</label>
+      <input type="text" id="ssid" name="ssid" required autocomplete="off">
+    </div>
+    <div class="field">
+      <label for="pass">Password</label>
+      <input type="password" id="pass" name="pass" autocomplete="off">
+    </div>
+    <button type="submit" id="submitBtn">Connect</button>
+  </form>
+  <div id="status"></div>
+</div>
+
+<script>
+  const networksEl = document.getElementById('networks');
+  const ssidInput = document.getElementById('ssid');
+  const passInput = document.getElementById('pass');
+  const form = document.getElementById('wifiForm');
+  const submitBtn = document.getElementById('submitBtn');
+  const statusEl = document.getElementById('status');
+
+  async function loadNetworks(){
+    try{
+      const res = await fetch('/scan');
+      const data = await res.json();
+      if(data.scanning){
+        setTimeout(loadNetworks, 1500);
+        return;
+      }
+      renderNetworks(data.networks || []);
+    } catch(err){
+      setTimeout(loadNetworks, 2000);
+    }
+  }
+
+  function renderNetworks(networks){
+    if(networks.length === 0){
+      networksEl.innerHTML = '<div id="scanStatus">No networks found. You can still type the name manually.</div>';
+      return;
+    }
+    networks.sort((a,b) => b.rssi - a.rssi);
+    networksEl.innerHTML = '';
+    networks.forEach(net => {
+      const row = document.createElement('div');
+      row.className = 'net';
+      row.innerHTML = '<span class="net-name">' + (net.secure ? '🔒 ' : '') + escapeHtml(net.ssid) + '</span>' +
+                       '<span class="net-signal">' + net.rssi + ' dBm</span>';
+      row.addEventListener('click', () => {
+        ssidInput.value = net.ssid;
+        passInput.focus();
+      });
+      networksEl.appendChild(row);
+    });
+  }
+
+  function escapeHtml(s){
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Connecting…';
+    statusEl.textContent = '';
+    statusEl.className = '';
+
+    try{
+      const body = new URLSearchParams();
+      body.set('ssid', ssidInput.value);
+      body.set('pass', passInput.value);
+      const res = await fetch('/connect', { method:'POST', body });
+      const data = await res.json();
+      if(data.ok){
+        statusEl.textContent = 'Saved. The device is restarting and connecting now, this page will stop responding, that\'s expected. Look for it at climate.local in a few seconds.';
+        statusEl.className = 'status-ok';
+      } else {
+        throw new Error(data.error || 'unknown error');
+      }
+    } catch(err){
+      statusEl.textContent = 'Something went wrong, try again.';
+      statusEl.className = 'status-err';
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Connect';
+    }
+  });
+
+  loadNetworks();
+</script>
+</body>
+</html>
