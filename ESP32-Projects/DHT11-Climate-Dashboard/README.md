@@ -78,8 +78,6 @@ So instead, history is one small file per day — `/log/2026-08-22.bin`, `/log/2
 - DHT11 sensor
 - Push button (momentary, normally-open)
 - 1.3" 128x64 I2C OLED display, **SSD1306 driver** (not SH1106 — visually identical modules exist under both drivers and they're not code-compatible; check yours before assuming)
-- RGB LED (common cathode), or three separate LEDs with current-limiting resistors if that's what you have on hand
-- Relay module or MOSFET (only needed if you're actually switching something with the automation output — see the safety note below)
 - Breadboard and jumper wires
 
 ### Wiring
@@ -96,21 +94,12 @@ So instead, history is one small file per day — `/log/2026-08-22.bin`, `/log/2
 | OLED | GND | GND |
 | OLED | SDA | GPIO21 |
 | OLED | SCL | GPIO22 |
-| RGB LED | Red | GPIO25 |
-| RGB LED | Green | GPIO26 |
-| RGB LED | Blue | GPIO33 |
-| RGB LED | Common cathode | GND |
-| Automation output | Signal | one of GPIO5 / 16 / 17 / 18 / 19 / 23 / 32 (chosen from the dashboard) |
 
 If you're using a bare DHT11 (not a breakout module), add a 10k pull-up resistor between DATA and 3.3V — most breakout modules already include this.
 
 The button uses the ESP32's internal pull-up (`INPUT_PULLUP`), no resistor needed. GPIO27 was picked over the board's BOOT button deliberately: BOOT is also a boot-mode strapping pin, and while holding it during normal operation is genuinely safe, a dedicated pin avoids that explanation and avoids confusion with the button already labeled BOOT.
 
 If the OLED stays blank, it's most often the I2C address — try `0x3D` instead of `0x3C` (`OLED_I2C_ADDR` near the top of the sketch) before assuming a wiring fault.
-
-**The automation output is a 3.3V logic-level GPIO signal, not a switched appliance output.** It's meant to drive a relay module or a MOSFET, never an appliance or mains voltage directly. Which GPIO it uses is chosen from the dashboard's Automation tab, from a pre-filtered list of seven pins (5, 16, 17, 18, 19, 23, 32) that avoids strapping pins, input-only pins, and everything else already spoken for on this board.
-
-If your RGB LED is common-anode rather than common-cathode, the color will come out inverted (full brightness reads as off). Swap the three `ledcWrite()` calls in `updateComfortLed()` to `255 - value` and it'll read correctly.
 
 ## Libraries
 
@@ -187,16 +176,6 @@ Updates logging interval (30–86400s), retention (1–90 days), and/or the logg
 ```
 Up to the last 50 tier-crossing events. `metric` is `T` or `H`; tiers are `0` (comfortable), `1` (warning), `2` (danger).
 
-**`GET /api/automation`**
-```json
-{ "enabled": true, "pin": 5, "metric": "T", "direction": "A",
-  "on_threshold": 28.0, "off_threshold": 26.0, "active": true,
-  "rgb_enabled": true, "comfort_score": 78, "available_pins": [5,16,17,18,19,23,32] }
-```
-`direction` is `A` (trigger above `on_threshold`) or `B` (trigger below it). `active` and `comfort_score` are live values, not settings — the dashboard polls this every 5 seconds for those two fields without re-touching the form.
-
-**`POST /api/automation`** (form-encoded, any subset of `enabled`, `pin`, `metric`, `direction`, `on_threshold`, `off_threshold`, `rgb_enabled`) — validates before saving: `pin` must be one of the seven allowed GPIOs, and `off_threshold` must sit on the correct side of `on_threshold` for the chosen direction (below it for `A`, above it for `B`). Rejects with `400` and an explanatory `error` field otherwise, rather than silently accepting a configuration that would just chatter on and off at the boundary.
-
 **`POST /api/wifi`** (form-encoded `ssid`, `pass`) — saves new credentials and restarts, without going through the captive portal.
 
 **`POST /api/forget-wifi`** — clears saved credentials and restarts into setup mode.
@@ -230,7 +209,6 @@ If you edit `Code.gs` later, create a new deployment (or update the existing one
 | Multi-page redesign | Sidebar/tab-bar navigation (Dashboard / History / Settings), configurable retention + interval, day-partitioned flash storage replacing the fixed RAM ring buffer, in-app WiFi network change |
 | View range + Alerts | Chart view-range zoom independent of retention, an Alerts tab with editable comfort thresholds and a tier-crossing event feed |
 | Local OLED display | On-device readout (temp, humidity, signal), boot splash with the channel logo, no phone/network required to check current conditions |
-| Automation + RGB comfort LED | Configurable GPIO automation output with hysteresis (separate on/off thresholds to avoid relay chatter), an RGB LED mirroring the dashboard's comfort score, both editable from a new Automation tab |
 
 ## Built with AI assistance
 
