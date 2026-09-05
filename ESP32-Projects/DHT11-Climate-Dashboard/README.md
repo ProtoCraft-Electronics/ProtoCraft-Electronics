@@ -17,7 +17,6 @@ An ESP32 reads temperature and humidity off a DHT11 and serves a live, color-cod
 - Reachable at `http://climate.local`, no IP address hunting
 - Change WiFi networks directly from the Settings tab, or fall back to a physical button (5-second hold) or the captive portal if the dashboard isn't reachable
 - One-click CSV export of everything currently retained, at full resolution
-- Optional background logging to a Google Sheet at whatever interval you've configured
 - No app, no required cloud account. Open the dashboard in any browser on the same network.
 
 ## Architecture
@@ -31,7 +30,6 @@ graph LR
     B -->|"GET /api/history (polled every 5 min)"| C
     B -->|append to today's file| D[("/log/YYYY-MM-DD.bin")]
     D -->|read + downsample on request| B
-    B -->|"HTTPS POST, per log interval (optional)"| E[Google Sheet]
 ```
 
 **Sensor to firmware.** The DHT11 has no idea a webpage exists. The firmware reads it every 2 seconds and holds the current value; logging to flash happens on a separate, configurable interval.
@@ -63,10 +61,6 @@ So instead, history is one small file per day — `/log/2026-08-22.bin`, `/log/2
 **WiFi setup: captive portal, not hardcoded credentials.** On first boot, or any time the saved network can't be reached, the ESP32 opens its own access point (`ProtoCraft-Setup`) with a DNS server that redirects any request to a setup page — this is what makes a phone auto-pop the "join this network" portal. Picking a network there saves the credentials to the ESP32's NVS and restarts into normal operation.
 
 **Three doors into the same WiFi-credential storage.** The captive portal's `/connect`, the Settings tab's "Save & reconnect" (`/api/wifi`), and the "Forget WiFi network" reset (triggered from the dashboard, from the physical button, or automatically when a saved network can't be reached) all write to or clear the same NVS-backed storage through the same small set of functions. One source of truth, several ways to reach it, rather than parallel logic that could quietly drift apart.
-
-**Why the cloud-logging POST is allowed to block, when nothing else is.** Pushing a reading to Google Sheets over HTTPS is the one blocking call in the whole sketch, and that's deliberate. It runs once per configured log interval, takes at most a second or two, and the dashboard stays fully responsive through it regardless, because `ESPAsyncWebServer` runs on its own task rather than depending on `loop()` to service it.
-
-**Why cloud logging pins a real certificate instead of `setInsecure()`.** Nearly every ESP32-to-Google-Sheets tutorial skips TLS certificate validation entirely. This project ships a `google_root_ca.h.example` template instead — pinning the actual root CA means the board can tell a real Google server from anyone impersonating one. See [cloud logging setup](#cloud-logging-setup-optional).
 
 **Viewing a range is not the same setting as keeping a range.** Retention (how long data is kept) and view range (how much of that shows on the chart right now) sound similar but answer different questions, so they're two separate controls rather than one. `/api/history` always downsamples to 480 points, but which slice of time those 480 points cover depends on an optional `?days=N` query param — "Today" and "Full retention" hit the exact same endpoint, just with a different range and therefore a different effective resolution per point. Only the day-files inside the requested range are opened; asking for "today" doesn't pay the cost of reading thirty files to use one of them.
 
@@ -120,15 +114,14 @@ Built with ESP32 Arduino core 3.x.
 ## Setup
 
 1. Clone or download this folder and open `firmware/DHT11-Climate-Dashboard-v5-pre-automation/DHT11-Climate-Dashboard-v5-pre-automation.ino` in the Arduino IDE. `icon_bitmap.h` sits in the same folder as a second tab — the IDE loads it automatically, nothing to configure.
-2. Copy `secrets.h.example` to `secrets.h`. WiFi credentials are not set here — this file only holds the optional Google Apps Script URL for cloud logging. Leave the placeholder if you don't want cloud logging.
-3. For cloud logging, also copy `google_root_ca.h.example` to `google_root_ca.h` and follow the instructions inside it.
-4. If you're not in India, change `GMT_OFFSET_SEC` near the top of the sketch.
-5. Install the LittleFS uploader plugin for Arduino IDE 2.x: grab the latest `.vsix` from [earlephilhower/arduino-littlefs-upload](https://github.com/earlephilhower/arduino-littlefs-upload/releases), drop it in `~/.arduinoIDE/plugins/`, restart the IDE.
-6. With the sketch folder open, upload the filesystem: `Ctrl+Shift+P` (`Cmd+Shift+P` on macOS) → **Upload LittleFS to Pico/ESP8266/ESP32**. This pushes `data/index.html` and `data/setup.html`.
-7. Upload the sketch itself.
-8. The board broadcasts **ProtoCraft-Setup**. Connect with your phone — a setup page should open automatically; if not, browse to `192.168.4.1`.
-9. Pick your network, enter the password, tap Connect. The board restarts and joins it.
-10. From then on, the dashboard is at **http://climate.local**. If mDNS doesn't resolve (see below), check the Serial Monitor at 115200 baud for the IP.
+2. Copy `secrets.h.example` to `secrets.h` — the sketch won't compile without it present. WiFi credentials are not set here (see step 8).
+3. If you're not in India, change `GMT_OFFSET_SEC` near the top of the sketch.
+4. Install the LittleFS uploader plugin for Arduino IDE 2.x: grab the latest `.vsix` from [earlephilhower/arduino-littlefs-upload](https://github.com/earlephilhower/arduino-littlefs-upload/releases), drop it in `~/.arduinoIDE/plugins/`, restart the IDE.
+5. With the sketch folder open, upload the filesystem: `Ctrl+Shift+P` (`Cmd+Shift+P` on macOS) → **Upload LittleFS to Pico/ESP8266/ESP32**. This pushes `data/index.html` and `data/setup.html`.
+6. Upload the sketch itself.
+7. The board broadcasts **ProtoCraft-Setup**. Connect with your phone — a setup page should open automatically; if not, browse to `192.168.4.1`.
+8. Pick your network, enter the password, tap Connect. The board restarts and joins it.
+9. From then on, the dashboard is at **http://climate.local**. If mDNS doesn't resolve (see below), check the Serial Monitor at 115200 baud for the IP.
 
 To move the board to a different network: the Settings tab has both **Save & reconnect** (switch to a specific new network directly) and **Forget WiFi network** (drop back into the captive portal to pick again). The physical button (5-second hold, LED blinks faster as you approach 5s) does the same as Forget WiFi, for when the dashboard itself isn't reachable.
 
@@ -182,30 +175,13 @@ Up to the last 50 tier-crossing events. `metric` is `T` or `H`; tiers are `0` (c
 
 During setup mode only: **`GET /scan`** (nearby networks) and **`POST /connect`** (form-encoded `ssid`, `pass` — saves and restarts).
 
-## Cloud logging setup (optional)
-
-Flash-backed history now covers real retention on its own (up to 30 days by default, adjustable up to 90), so cloud logging isn't the only way to get a permanent record anymore — but it's still the only way to get your data *off* the device: for backup independent of the board's health, for viewing from somewhere other than the local network, or for aggregating multiple sensor nodes into one place later.
-
-1. Create a blank Google Sheet.
-2. Extensions > Apps Script, paste in [`google-apps-script/Code.gs`](google-apps-script/Code.gs) from this repo.
-3. Deploy > New deployment > **Web app** > Execute as **Me** > Who has access **Anyone** > Deploy. Copy the URL.
-4. Paste it into `secrets.h` as `GOOGLE_SCRIPT_URL`.
-5. Get the current root certificate for `script.google.com` and put it in `google_root_ca.h` — instructions are in `google_root_ca.h.example`; short version: `openssl s_client -connect script.google.com:443 -showcerts` and take the last certificate printed.
-6. Reflash. The Serial Monitor prints `[cloud] logged` on each logging interval once it's working.
-
-Cloud logging now runs at whatever interval you've set in the History tab, not a fixed 5 minutes — a faster interval means more Apps Script executions, worth keeping in mind against its free-tier daily quota if you set something aggressive.
-
-The one-line shortcut, `WiFiClientSecure::setInsecure()`, skips certificate validation entirely and is what nearly every other tutorial uses. Fine for a quick personal project, not something to carry into anything more serious — see the architecture section above for the trade-off.
-
-If you edit `Code.gs` later, create a new deployment (or update the existing one) for changes to take effect.
-
 ## Project history
 
 | Stage | What it added |
 | --- | --- |
 | Base dashboard | DHT11 reading, async web server, gauges, comfort index |
 | WiFi setup + mDNS | Captive portal provisioning, `climate.local`, physical + dashboard WiFi reset |
-| CSV + cloud logging | CSV export, optional Google Sheets logging with a pinned root CA |
+| CSV export | One-click CSV export of everything currently retained, at full resolution |
 | Multi-page redesign | Sidebar/tab-bar navigation (Dashboard / History / Settings), configurable retention + interval, day-partitioned flash storage replacing the fixed RAM ring buffer, in-app WiFi network change |
 | View range + Alerts | Chart view-range zoom independent of retention, an Alerts tab with editable comfort thresholds and a tier-crossing event feed |
 | Local OLED display | On-device readout (temp, humidity, signal), boot splash with the channel logo, no phone/network required to check current conditions |
