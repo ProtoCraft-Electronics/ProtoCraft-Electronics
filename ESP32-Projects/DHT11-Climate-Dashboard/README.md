@@ -236,17 +236,18 @@ If you edit `Code.gs` later, create a new deployment (or update the existing one
 
 I'm a hardware engineer, not a web designer. The dashboard's visual design was built with Claude, and the firmware was scaffolded with AI assistance, then reviewed and adjusted by hand against how the ESP32 actually handles memory and flash.
 
-The webpage prompt below reconstructs the *base dashboard's* design as a single request — the multi-page redesign (History/Alerts/Settings tabs) was built directly in conversation rather than from a single upfront prompt, so none of that is reflected there. The firmware prompt, by contrast, has been kept up to date to match the current sketch, with two deliberate exceptions: cloud logging to Google Sheets and the GPIO automation output are both left out, since those are the subject of a follow-up video.
+Both prompts below have been kept up to date to match the current sketch and dashboard, with two deliberate exceptions in the firmware prompt: cloud logging to Google Sheets and the GPIO automation output are both left out, since those are the subject of a follow-up video.
 
 <details>
 <summary>Prompt: webpage design</summary>
 
 ```
-Build a single-file HTML/CSS/JS dashboard (no framework, no build step) for an
-ESP32-based home climate monitor reading temperature and humidity from a DHT11
-sensor. This page will be served as a static file from the ESP32's flash
-storage, so it must be self-contained, lightweight, and use no external
-dependencies except Chart.js (via cdnjs.cloudflare.com) for the history graphs.
+Build a single-file HTML/CSS/JS multi-page dashboard (no framework, no build
+step) for an ESP32-based home climate monitor reading temperature and
+humidity from a DHT11 sensor. This page will be served as a static file from
+the ESP32's flash storage, so it must be self-contained, lightweight, and use
+no external dependencies except Chart.js (via cdnjs.cloudflare.com) for the
+history graphs.
 
 DESIGN DIRECTION
 Do not use a dark navy/teal/orange "brand" palette. Instead, design something
@@ -255,54 +256,88 @@ engineering tool: soft pastel gradient background (peach, pink, violet, sky,
 mint), blurred color-blob accents, glass-morphism cards (semi-transparent
 white, backdrop blur). Rounded corners, generous spacing, a friendly
 sans-serif font (Outfit or similar via Google Fonts, with a system-font
-fallback).
+fallback, plus a monospace font for IP/hostname-style values).
 
-LAYOUT
-- Top bar: logo/icon, title "ProtoCraft Home Climate Monitor", subtitle,
-  and a live-status pill (dot + "Live · updated Xs ago").
-- Two gauge cards, side by side on desktop, stacked on mobile below 600px:
-  Temperature and Humidity. Each is a circular SVG progress ring with a big
-  center number, a status badge below it (e.g. "Comfortable" / "Too hot"),
-  and a small range note.
-- A "comfort index" card combining both readings into one plain-language
-  verdict: Great / OK / Poor, with a colored icon and a one-sentence
-  explanation.
-- Two separate history chart cards (not combined into one chart):
-  "Temperature history" and "Humidity history", each a Chart.js line chart
-  with a gradient fill under the line, showing a rolling 24-hour window.
-  Below 700px these stack vertically.
-- A footer strip: IP address, uptime (HH:MM:SS), sensor model, WiFi signal
-  strength, in a monospace font.
+LAYOUT - four pages behind client-side navigation (no page reload), a
+sidebar with nav links + a device-status card on desktop, collapsing to a
+bottom tab bar on mobile (below ~768px):
 
-GAUGE COLOR LOGIC
-Both gauges use a continuous color gradient (RGB interpolation across defined
-value "stops"), not discrete color jumps:
-- Temperature: blue at 10°C, green at 20°C, amber at 28°C, red at 35°C and
-  above. Below 10°C stays blue, above 35°C stays red.
-- Humidity: red at 25% and below, amber around 35%, teal (ideal) around 50%,
-  blue around 70%, red again at 95% and above.
-Status badges (separate from the ring color) use their own thresholds:
-comfortable 20-26°C, too cold below 17°C, too hot at 35°C+; humidity ideal
-40-60%, too dry below 25%, too humid at 95%+.
+- Dashboard: a hero card with a single circular SVG "comfort score" ring
+  (0-100, big center number) and a one-line plain-language verdict (Great /
+  OK / Poor) with a supporting sentence. Beside it, two smaller stat cards
+  (Temperature, Humidity) with an icon, the current value, and a status
+  badge (e.g. "Comfortable" / "A bit warm" / "Too hot"). Below that, a
+  three-item footer strip: device online/offline, sensor model, and "last
+  update Xs ago".
+- History: data-logger controls (a "keep history for" dropdown [1/3/7/14/30
+  days], a "log every" dropdown [1/5/15/30 min, 1 hour], pause/resume and
+  clear-history buttons, a live estimate of raw storage size and effective
+  chart resolution given the current picks, and a CSV download button), a
+  row of view-range buttons (Today / 3 days / 7 days / Full retention) that
+  are independent of the logging settings above, and two separate Chart.js
+  line charts - "Temperature history" and "Humidity history" - each with a
+  gradient fill under the line.
+- Alerts: editable min/max threshold fields for temperature and humidity
+  comfort/warning bands, a save button, and a reverse-chronological list of
+  logged tier-crossing events (metric, old tier -> new tier, value,
+  timestamp).
+- Settings: a WiFi card (current SSID, fields to enter a new
+  network+password with a "Save & reconnect" button, and a "Forget WiFi
+  network" button) and a read-only device-info card (IP, hostname, sensor,
+  uptime as HH:MM:SS, signal in dBm, cloud-logging enabled/disabled).
+
+COMFORT / STATUS COLOR LOGIC
+Discrete three-tier coloring (comfortable / warning / danger), not a
+continuous gradient - driven by the same threshold fields the Alerts page
+edits, defaulting to: temperature comfortable 20-26°C, warning 17-35°C,
+danger outside that; humidity comfortable 40-60%, warning 25-95%, danger
+outside that. The comfort ring's color and its 0-100 score are derived by
+averaging a fixed score per tier (good=100, warn=60, bad=20) across
+temperature and humidity - color the ring green at 85+, amber at 55-84, red
+below that. Each stat card's own color and badge text use that metric's own
+tier independently, so e.g. temperature can read "Comfortable" while
+humidity reads "A bit humid" at the same time.
 
 DATA SOURCE
-The page has no simulated or hardcoded data. It fetches from two JSON
-endpoints on the same host:
+The page has no simulated or hardcoded data. It fetches from JSON endpoints
+on the same host, all under /api/, plus a plain-text CSV download:
 
 GET /api/now
-  { "temp": 24.6, "hum": 52.3, "rssi": -58, "uptime": 4213, "ip": "192.168.1.47" }
-  temp/hum may be null if a sensor read hasn't succeeded yet.
-  Poll this every 5 seconds. Update both gauges, the comfort card, uptime
-  (format seconds as HH:MM:SS), IP, and signal strength from the response.
+  { "temp": 24.6, "hum": 52.3, "rssi": -58, "uptime": 4213, "ip": "192.168.1.47",
+    "hostname": "climate.local", "ssid": "HomeWiFi_5G", "cloud_logging": true,
+    "logging_enabled": true, "interval_sec": 300, "retention_days": 7 }
+  temp/hum may be null if a sensor read hasn't succeeded yet. Poll every 5
+  seconds. Drive the comfort ring, both stat cards, the footer/device-info
+  fields, and (once, on first response) seed the History page's dropdowns
+  and view-range buttons from interval_sec/retention_days without
+  overwriting whatever the user has since changed on screen.
 
-GET /api/history
-  { "interval_sec": 300, "points": [ { "ts": 1755680400, "temp": 24.1, "hum": 55.0 }, ... ] }
-  ts is a Unix timestamp in seconds; format as local HH:MM for chart labels.
-  Poll this once on load and every 5 minutes after. Replace both charts'
-  data entirely on each fetch, don't append.
+GET /api/history?days=N (days omitted = full retention window)
+  { "interval_sec": 300, "retention_days": 7, "view_days": 7,
+    "points": [ { "ts": 1755680400, "temp": 24.1, "hum": 55.0 }, ... ] }
+  ts is a Unix timestamp in seconds; format as local HH:MM for a single-day
+  view, or "DD/MM HH:MM" once the view spans more than one day. Poll once on
+  load, every 5 minutes after, and immediately whenever a view-range button
+  is clicked. Replace both charts' data entirely on each fetch, don't append.
 
-If either fetch fails, show a visibly different connection state (e.g. the
-status dot turns red/amber and the status text changes to "Reconnecting…")
+GET /api/thresholds - the eight threshold values, used to populate the
+Alerts page's fields and to color the Dashboard.
+POST /api/thresholds (form-encoded, same eight fields) - save button on the
+Alerts page.
+GET /api/alerts - { "events": [ { "ts", "metric": "T"|"H", "from_tier",
+  "to_tier", "value" }, ... ] }, fetched when the Alerts page is opened.
+POST /api/settings (form-encoded interval_sec / retention_days / enabled) -
+  the History page's Apply button and Pause/Resume toggle.
+POST /api/history/clear - the History page's Clear button, behind a
+  confirm() since it's destructive.
+GET /export.csv - the Download CSV button just navigates the browser here.
+POST /api/wifi (form-encoded ssid, pass) - Settings page's Save & reconnect,
+  behind a confirm() since the device restarts.
+POST /api/forget-wifi - Settings page's Forget WiFi network, behind a
+  confirm() since it drops back into the captive portal.
+
+If a polling fetch fails, show a visibly different connection state (e.g.
+the status dot turns red and the status text changes to "Reconnecting…")
 rather than silently going stale, and recover automatically once a fetch
 succeeds again.
 
