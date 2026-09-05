@@ -100,3 +100,6 @@ metadata.md
 
 # Real credentials for firmware sketches — copy from secrets.h.example
 secrets.h
+
+# Real root CA cert for firmware sketches — copy from google_root_ca.h.example
+google_root_ca.h

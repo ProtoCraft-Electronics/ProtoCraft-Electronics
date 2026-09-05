@@ -236,7 +236,7 @@ If you edit `Code.gs` later, create a new deployment (or update the existing one
 
 I'm a hardware engineer, not a web designer. The dashboard's visual design was built with Claude, and the firmware was scaffolded with AI assistance, then reviewed and adjusted by hand against how the ESP32 actually handles memory and flash.
 
-The two prompts below reconstruct the *base dashboard's* design as a single request each — everything from the WiFi setup onward, including this multi-page redesign, was built directly in conversation rather than from a single upfront prompt, so none of that is reflected here.
+The webpage prompt below reconstructs the *base dashboard's* design as a single request — the multi-page redesign (History/Alerts/Settings tabs) was built directly in conversation rather than from a single upfront prompt, so none of that is reflected there. The firmware prompt, by contrast, has been kept up to date to match the current sketch, with two deliberate exceptions: cloud logging to Google Sheets and the GPIO automation output are both left out, since those are the subject of a follow-up video.
 
 <details>
 <summary>Prompt: webpage design</summary>
@@ -316,19 +316,42 @@ Responsive down to a 360px-wide mobile screen. No localStorage/sessionStorage.
 
 ```
 Write an Arduino sketch for an ESP32 that reads a DHT11 sensor and serves a
-web dashboard and JSON API over WiFi, using an async web server so multiple
-browser tabs/devices can load it at once without blocking each other or the
-sensor loop.
+multi-page web dashboard and JSON API over WiFi, using an async web server so
+multiple browser tabs/devices can load it at once without blocking each other
+or the sensor loop.
 
 HARDWARE
-DHT11 data pin on GPIO4 (adjustable). Standard WiFi station mode connection
-using credentials from a separate secrets.h file (WIFI_SSID, WIFI_PASSWORD),
-so credentials never live in the main sketch.
+- DHT11 data pin on GPIO4 (adjustable). If it's a bare DHT11 (not a breakout
+  module), note that it needs a 10k pull-up resistor to 3.3V.
+- Push button on GPIO27 to GND (internal pull-up, no resistor needed). Hold
+  5 seconds to forget the saved WiFi network and drop back into setup mode.
+- Status LED on GPIO2, used purely as hold-progress feedback for that button
+  (blink rate increases as the 5-second hold approaches).
+- 1.3" 128x64 I2C OLED, SSD1306 driver (not SH1106 - visually identical
+  modules exist under both drivers and aren't code-compatible, so call this
+  out), on the default I2C pins (SDA=GPIO21, SCL=GPIO22), address 0x3C
+  (fall back to 0x3D if the display doesn't initialize).
+- No hardcoded WiFi credentials anywhere in the sketch - see WIFI SETUP
+  below for how the network gets configured instead.
 
 LIBRARIES
-DHT sensor library + Adafruit Unified Sensor (Adafruit), ESPAsyncWebServer +
-AsyncTCP (ESP32Async), ArduinoJson v7, LittleFS, WiFi.h, time.h. Target ESP32
-Arduino core 3.x.
+DHT sensor library + Adafruit Unified Sensor (Adafruit), Adafruit GFX Library
++ Adafruit SSD1306 (Adafruit), ESPAsyncWebServer + AsyncTCP (ESP32Async),
+ArduinoJson v7, LittleFS, WiFi.h, DNSServer, Preferences, ESPmDNS, time.h,
+Wire.h. Target ESP32 Arduino core 3.x.
+
+WIFI SETUP - captive portal, not hardcoded credentials
+On first boot, or any time the previously-saved network can't be reached,
+the ESP32 should open its own access point ("ProtoCraft-Setup") with a DNS
+server that redirects any request to a setup page, so a phone auto-pops the
+"join this network" portal. That page scans for nearby networks, lets the
+user pick one and enter a password, and on submit saves the credentials to
+NVS (via Preferences) and restarts into normal station-mode operation.
+Provide three doors into that same saved-credential storage, all going
+through the same small set of functions rather than parallel logic: the
+captive portal itself, a "change network" action reachable from the running
+dashboard's Settings tab, and a "forget this network" action reachable both
+from the dashboard and from the physical button's 5-second hold.
 
 BEHAVIOR
 - Read the DHT11 every 2 seconds (not faster — the sensor needs at least 1
@@ -338,42 +361,113 @@ BEHAVIOR
   the top of the file, clearly commented so it's easy to change for a
   different timezone). Timestamps for history should be real Unix time, not
   seconds-since-boot, so they survive a reboot correctly.
-- Maintain a fixed-size ring buffer of 288 history points in RAM (temp,
-  humidity, timestamp), representing a 24-hour window at 5-minute intervals.
-  When full, the oldest point is overwritten by the newest.
-- Every 5 minutes, append the current reading to the ring buffer AND persist
-  the entire buffer to a single LittleFS file, written in chronological
-  order (oldest first) so it can be reloaded directly into the buffer after
-  a reboot. Do not write to flash on every sensor read — only on this
-  5-minute interval. Store points as a compact binary struct (timestamp +
-  temp*10 and humidity*10 as int16), not as JSON, to keep the file small and
-  avoid parsing overhead on boot.
-- No delay() calls anywhere in loop(). Both the sensor-read interval and the
-  history-log interval should be gated by comparing millis() against a
-  stored "last done at" timestamp, so the loop never blocks and the async
-  server can respond to requests immediately regardless of where loop()
-  currently is.
-- Serve a static dashboard file from LittleFS at "/" (the frontend is a
-  separate deliverable, assume a data/index.html file already exists and
-  gets uploaded to LittleFS separately, don't embed HTML in the sketch).
+- Store history as one small file per day (e.g. /log/2026-08-22.bin) rather
+  than a single fixed-size ring buffer file - every logged point gets
+  appended to today's file only, and once a day ages past a configurable
+  retention window (default 7 days, adjustable 1-90), its whole file gets
+  deleted. Both appending and whole-file deletion are the fast operations on
+  a flash filesystem like LittleFS; overwriting data in the middle of an
+  existing file is the slow one, which is exactly what an in-place ring
+  buffer does once full - so avoid that pattern entirely. Store points as a
+  compact binary struct (timestamp + temp*10 and humidity*10 as int16), not
+  as JSON, to keep files small and avoid parsing overhead.
+- Logging interval and retention window are both runtime-configurable
+  (persisted to NVS), not compile-time constants - interval from 30 seconds
+  to 24 hours, retention from 1 to 90 days. A separate boolean can pause
+  logging entirely without losing the saved settings.
+- No delay() calls anywhere in loop(), except the handful of one-time
+  startup steps (WiFi connect attempt, NTP sync, boot splash) where nothing
+  else needs to run yet. Both the sensor-read interval and the history-log
+  interval should be gated by comparing millis() against a stored "last done
+  at" timestamp, so the loop never blocks and the async server can respond
+  to requests immediately regardless of where loop() currently is.
+- Track a simple threshold-based comfort tier (comfortable / warning /
+  danger) for temperature and humidity independently, using editable
+  min/max boundaries persisted to NVS. Record an event only when a reading's
+  tier actually changes (not on every out-of-range reading, which would spam
+  near-duplicate entries on a slowly drifting sensor) - keep the last N of
+  these in a small ring buffer that's fine to persist to flash on every
+  write, since tier changes are rare by nature.
+- Serve the multi-page dashboard from LittleFS at "/" (the frontend is a
+  separate deliverable, assume a data/ folder with the page files already
+  exists and gets uploaded to LittleFS separately, don't embed HTML in the
+  sketch).
+- OLED is a fourth, independent view of the same state the webpage reads -
+  it doesn't maintain any state of its own. On boot, before WiFi even
+  attempts to connect, show a one-time splash screen (logo + wordmark) for
+  a couple of seconds - this is the one place a blocking delay() is fine,
+  since it only runs once at startup. During setup mode, show the access
+  point name instead of the normal status screen, so there's a way to check
+  what's going on without a phone already in hand. Otherwise redraw the
+  status screen after every successful sensor read (same 2-second cadence as
+  the DHT11 read, not a separate timer): current temperature, current
+  humidity, and a WiFi signal-strength indicator (bars, derived from RSSI).
+  If the display fails to initialize, log it and continue running everything
+  else normally - the OLED is a nice-to-have, not a dependency for the rest
+  of the sketch.
 
 API (must match exactly, a separate frontend depends on this contract)
 
 GET /api/now
   Returns: { "temp": <float or null>, "hum": <float or null>, "rssi": <int>,
-  "uptime": <seconds since boot>, "ip": "<local IP as string>" }
+  "uptime": <seconds since boot>, "ip": "<local IP as string>",
+  "hostname": "climate.local", "ssid": "<connected SSID>",
+  "logging_enabled": <bool>, "interval_sec": <int>, "retention_days": <int> }
   temp/hum are null if no successful read has happened yet.
 
-GET /api/history
-  Returns: { "interval_sec": 300, "points": [ { "ts": <unix seconds>,
-  "temp": <float>, "hum": <float> }, ... ] }
-  Points ordered oldest to newest, only as many as currently exist in the
-  buffer (don't pad with zeros before it's full).
+GET /api/history?days=<N> (optional, 1 to current retention; omit for the
+full retention window)
+  Returns: { "interval_sec": <int>, "retention_days": <int>,
+  "view_days": <int>, "points": [ { "ts": <unix seconds>, "temp": <float>,
+  "hum": <float> }, ... ] }
+  Always downsample to a fixed number of averaged points (e.g. 480)
+  regardless of the requested range, so the response size and chart redraw
+  cost stay constant whether the range is one day or the full retention
+  window. Only open the day-files the requested range actually needs.
 
-Comment the code to explain: why LittleFS writes are batched instead of
-per-read, why the sensor read interval is 2 seconds, why timestamps come
-from NTP rather than millis(), and provide a secrets.h.example template
-alongside the real secrets.h (which should be gitignored).
+GET /export.csv
+  Streams the full, un-downsampled history across all retained day-files as
+  "date,time,temp_c,humidity_pct", one day-file at a time, without holding
+  more than one record in memory at once.
+
+POST /api/settings (form-encoded, any subset)
+  interval_sec, retention_days, enabled - updates the logging config,
+  persists to NVS, and triggers an immediate retention cleanup pass.
+
+POST /api/history/clear
+  Deletes every day-file.
+
+GET /api/thresholds
+  Returns the eight comfort/warning boundary values (temp and humidity,
+  each with a comfort min/max and a warn min/max).
+
+POST /api/thresholds (form-encoded, any subset of those eight fields)
+  Updates the boundaries and persists to NVS. Also resets whatever tier was
+  last recorded for temperature and humidity, so the very next reading is
+  compared against the new boundaries rather than a stale comparison against
+  the old ones.
+
+GET /api/alerts
+  Returns up to the last 50 tier-crossing events (timestamp, which metric,
+  from-tier, to-tier, value).
+
+POST /api/wifi (form-encoded ssid, pass)
+  Saves new credentials through the same storage the captive portal uses,
+  and restarts - lets the dashboard switch networks without going through
+  the portal.
+
+POST /api/forget-wifi
+  Clears saved credentials and restarts into setup mode.
+
+During setup mode only:
+GET /scan - nearby networks, as JSON.
+POST /connect (form-encoded ssid, pass) - saves and restarts.
+
+Comment the code to explain: why history is one file per day instead of an
+in-place ring buffer, why the sensor read interval is 2 seconds, why
+timestamps come from NTP rather than millis(), why the OLED redraws on the
+sensor-read cadence rather than its own timer, and why alerts are recorded
+only on a tier change rather than on every out-of-range reading.
 ```
 
 </details>
