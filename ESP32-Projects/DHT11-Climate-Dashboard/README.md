@@ -21,15 +21,19 @@ An ESP32 reads temperature and humidity off a DHT11 and serves a live, color-cod
 
 ## Architecture
 
-Three layers, each one only aware of the layer directly below it.
+Sensor, firmware, and flash form the core three-layer chain, each one only aware of the layer directly below it — the OLED, the physical button, and the captive portal all just hang off the firmware as additional interfaces to the same state.
 
 ```mermaid
 graph LR
     A[DHT11 sensor] -->|digital read, every 2s| B[ESP32 firmware]
+    B -->|redraw after every sensor read| E[OLED display]
     B -->|"GET /api/now (polled every 5s)"| C[Web dashboard]
     B -->|"GET /api/history (polled every 5 min)"| C
     B -->|append to today's file| D[("/log/YYYY-MM-DD.bin")]
     D -->|read + downsample on request| B
+    F[Push button - 5s hold] -->|forget saved WiFi| B
+    B -->|no saved network, or just forgotten| G[Captive portal AP]
+    G -->|"POST /connect (ssid, pass)"| B
 ```
 
 **Sensor to firmware.** The DHT11 has no idea a webpage exists. The firmware reads it every 2 seconds and holds the current value; logging to flash happens on a separate, configurable interval.
