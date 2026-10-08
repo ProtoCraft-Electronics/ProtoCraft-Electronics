@@ -28,6 +28,7 @@ Part of the **ProtoCraft Electronics** ESP32 Foundation series. No extra librari
 - [Glossary](#glossary)
 - [Known simplifications](#known-simplifications)
 - [Files in this folder](#files-in-this-folder)
+- [Video](#video)
 
 ## Quick start
 
@@ -453,6 +454,11 @@ This is a learning project, so a few things are kept simple on purpose.
 | `firmware/esp32_web_led_switch/esp32_web_led_switch.ino` | The ESP32 program |
 | `firmware/esp32_web_led_switch/secrets.h.example` | A template for your WiFi details. Copy it to `secrets.h` |
 
+## Video
+
+[ProtoCraft Electronics](https://www.youtube.com/channel/UCBnjPIkKBEFrhlGcf1cxJmw?sub_confirmation=1) YouTube channel.
+Watch: (link TBD)
+
 ## License
 
-Code: MIT. See the repository root for the full text.
+Code: MIT. Hardware/wiring notes: CC BY 4.0. See the repository root for full license text.
