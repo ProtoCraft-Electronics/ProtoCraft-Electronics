@@ -1,0 +1,2 @@
+# Keep WiFi credentials out of the repository
+firmware/**/secrets.h
