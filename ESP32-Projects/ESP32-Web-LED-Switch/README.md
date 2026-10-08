@@ -4,7 +4,7 @@ Turn an LED on and off from your phone. The ESP32 joins your WiFi, hosts its own
 
 You do not need any coding experience. If you can follow the steps below, you can build this. It takes about 30 minutes the first time, including software setup.
 
-![The web page on a phone, with the light off and on](web_page_off_on.png)
+![The web page on a phone, with the light off and on](docs/web_page_off_on.png)
 
 Part of the **ProtoCraft Electronics** ESP32 Foundation series. No extra libraries to install: WiFi and WebServer come with the ESP32 board package.
 
@@ -84,7 +84,7 @@ The ESP32 is the **web server**. Your phone or laptop is the **client**.
 
 ## Step 1: Wire it up
 
-![Wiring diagram: GPIO 2 to resistor to LED long leg, LED short leg to GND](wiring_diagram.png)
+![Wiring diagram: GPIO 2 to resistor to LED long leg, LED short leg to GND](docs/wiring_diagram.png)
 
 The circuit has four parts in one loop: GPIO 2, the resistor, the LED, and GND.
 
@@ -167,7 +167,7 @@ Pick one way.
 
 1. Open the [ProtoCraft-Electronics repository](https://github.com/ProtoCraft-Electronics/ProtoCraft-Electronics).
 2. Click the green **Code** button, then **Download ZIP**.
-3. Unzip it. Open the folder `ESP32-Projects/esp32-web-led-switch/`.
+3. Unzip it. Open the folder `ESP32-Projects/ESP32-Web-LED-Switch/`.
 
 **With Git:**
 
@@ -447,8 +447,8 @@ This is a learning project, so a few things are kept simple on purpose.
 | File | What it is |
 |---|---|
 | `README.md` | This guide |
-| `wiring_diagram.png` | The wiring picture |
-| `web_page_off_on.png` | What the web page looks like |
+| `docs/wiring_diagram.png` | The wiring picture |
+| `docs/web_page_off_on.png` | What the web page looks like |
 | `.gitignore` | Tells Git to ignore `secrets.h`, so your password is never uploaded |
 | `firmware/esp32_web_led_switch/esp32_web_led_switch.ino` | The ESP32 program |
 | `firmware/esp32_web_led_switch/secrets.h.example` | A template for your WiFi details. Copy it to `secrets.h` |
