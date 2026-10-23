@@ -1,6 +1,6 @@
 # STM32 Clock Speed Prime Benchmark: Change the Clock Tree, Measure the Result
 
-Change the clock configuration of an STM32G0 and measure what it actually does to performance. A prime-number benchmark runs for a fixed time window at 8, 16, 32, 48 and 64 MHz, prints the result over the serial port, and ends with a summary table. Part of **ProtoCraft Electronics**'s "STM32 Bring-Up" series.
+Change the clock configuration of an STM32G0 and measure what it actually does to performance. A prime-number benchmark runs for a fixed time window at 8, 16, 32, 48 and 64 MHz, prints the result over the serial port, and ends with a summary table. Companion project to the [ProtoCraft Electronics](https://www.youtube.com/channel/UCBnjPIkKBEFrhlGcf1cxJmw?sub_confirmation=1) YouTube channel.
 
 Tested on a NUCLEO-G070RB with STM32CubeIDE, Debug build (-O0).
 
@@ -254,6 +254,12 @@ For other frequencies CubeMX may choose a different M, N and R combination than 
 - Power at different clocks is not measured by this firmware.
 - The wait-state explanation of the cycles-per-division trend is a hypothesis supported by the numbers, not a proven result.
 
+## 📺 Video
+
+Standalone video on the
+[ProtoCraft Electronics](https://www.youtube.com/channel/UCBnjPIkKBEFrhlGcf1cxJmw?sub_confirmation=1) YouTube channel.
+Video link: coming soon.
+
 ## Repository Structure
 
 ```
@@ -273,3 +279,4 @@ Released under the MIT License, see `LICENSE` at the repo root. Use it, modify i
 
 Built by **ProtoCraft Electronics**, hardware tutorials from a working hardware design engineer, no fluff, real debugging included.
 More builds: `github.com/ProtoCraft-Electronics/ProtoCraft-Electronics`
+YouTube: [youtube.com/@ProtoCraftElectronics](https://www.youtube.com/channel/UCBnjPIkKBEFrhlGcf1cxJmw?sub_confirmation=1)
