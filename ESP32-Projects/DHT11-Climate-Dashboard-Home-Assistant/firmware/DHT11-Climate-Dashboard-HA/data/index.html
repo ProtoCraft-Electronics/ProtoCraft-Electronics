@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ProtoCraft Climate Monitor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-peach:#FFE8D6; --bg-pink:#FBD5E8; --bg-violet:#E3D8FB; --bg-sky:#D2ECFB; --bg-mint:#D6F5E3;
+    --blob-violet:#8B5CF6; --blob-pink:#F472B6; --blob-orange:#FB923C; --blob-teal:#2DD4BF;
+    --ink:#241B3A; --ink-soft:#5B5470; --ink-faint:#9C96AD;
+    --card:rgba(255,255,255,0.72); --card-border:rgba(255,255,255,0.9);
+    --good:#0F9D6C; --good-bg:#D9F7EA; --warn:#B4740E; --warn-bg:#FDECC8; --bad:#C22E2E; --bad-bg:#FBDCDC;
+    --sidebar-w:230px;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    font-family:'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color:var(--ink);
+    background:
+      radial-gradient(circle at 12% 8%, var(--bg-peach) 0%, transparent 45%),
+      radial-gradient(circle at 90% 5%, var(--bg-pink) 0%, transparent 50%),
+      radial-gradient(circle at 95% 60%, var(--bg-sky) 0%, transparent 45%),
+      radial-gradient(circle at 5% 70%, var(--bg-mint) 0%, transparent 45%),
+      radial-gradient(circle at 50% 95%, var(--bg-violet) 0%, transparent 55%),
+      #FFF8F0;
+    min-height:100vh;
+  }
+  .blob{position:fixed; border-radius:50%; filter:blur(60px); opacity:0.3; z-index:0; animation:drift 18s ease-in-out infinite;}
+  .blob1{width:280px;height:280px;background:var(--blob-violet); top:-80px; left:220px;}
+  .blob2{width:220px;height:220px;background:var(--blob-orange); top:120px; right:-60px; animation-delay:3s;}
+  .blob3{width:240px;height:240px;background:var(--blob-teal); bottom:80px; left:250px; animation-delay:6s;}
+  @keyframes drift{0%,100%{transform:translate(0,0) scale(1);} 50%{transform:translate(20px,-24px) scale(1.08);}}
+
+  .app{display:flex; min-height:100vh; position:relative; z-index:1;}
+
+  .sidebar{
+    width:var(--sidebar-w);
+    flex-shrink:0;
+    padding:24px 18px;
+    display:flex;
+    flex-direction:column;
+    gap:24px;
+    position:sticky;
+    top:0;
+    height:100vh;
+  }
+  .brand{display:flex; align-items:center; gap:10px;}
+  .brand-icon{width:38px;height:38px;border-radius:50%;overflow:hidden;flex-shrink:0;box-shadow:0 6px 16px rgba(36,27,58,0.15);}
+  .brand-icon img{width:100%;height:100%;object-fit:cover;}
+  .brand h1{font-size:16px; font-weight:700;}
+  .brand span{display:block; font-size:11px; color:var(--ink-soft);}
+
+  .nav-links{display:flex; flex-direction:column; gap:4px;}
+  .nav-link{
+    display:flex; align-items:center; gap:10px;
+    padding:11px 14px; border-radius:12px;
+    border:none; background:transparent;
+    font-family:inherit; font-size:14px; font-weight:600; color:var(--ink-soft);
+    cursor:pointer; text-align:left; transition:background 0.15s ease;
+  }
+  .nav-link:hover{background:rgba(255,255,255,0.5);}
+  .nav-link.active{background:rgba(255,255,255,0.85); color:var(--ink); box-shadow:0 4px 14px rgba(90,60,150,0.10);}
+  .nav-link svg{flex-shrink:0;}
+
+  .device-card{
+    margin-top:auto;
+    background:rgba(255,255,255,0.6);
+    border:1px solid var(--card-border);
+    border-radius:16px;
+    padding:14px;
+  }
+  .device-status{display:flex; align-items:center; gap:7px; font-size:12px; font-weight:600; color:var(--good); margin-bottom:8px;}
+  .dot{width:7px;height:7px;border-radius:50%; background:var(--good); box-shadow:0 0 0 3px rgba(15,157,108,0.18); animation:pulse 2s ease-in-out infinite;}
+  @keyframes pulse{0%,100%{opacity:1;} 50%{opacity:0.5;}}
+  .device-name{font-size:14px; font-weight:700; margin-bottom:4px;}
+  .device-meta{font-size:11px; color:var(--ink-faint); font-family:'JetBrains Mono', monospace;}
+
+  .content{flex:1; padding:28px 32px 100px; min-width:0;}
+  .page{display:none;}
+  .page.active{display:block;}
+  .page-head{margin-bottom:20px;}
+  .page-head h2{font-size:22px; font-weight:700; margin-bottom:4px;}
+  .page-head p{font-size:13.5px; color:var(--ink-soft);}
+
+  .card{
+    background:var(--card); backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px);
+    border:1px solid var(--card-border); border-radius:22px; padding:20px;
+    box-shadow:0 10px 40px rgba(90,60,150,0.08);
+  }
+
+  /* Dashboard page */
+  .dash-grid{display:grid; grid-template-columns:1.1fr 1fr; gap:16px; margin-bottom:16px;}
+  @media (max-width:900px){.dash-grid{grid-template-columns:1fr;}}
+
+  .hero-card{
+    background:linear-gradient(160deg, #4C3A8C 0%, #2A2560 100%);
+    color:#fff; border-radius:24px; padding:26px;
+    display:flex; flex-direction:column; align-items:center; text-align:center;
+    box-shadow:0 16px 40px rgba(42,37,96,0.35);
+  }
+  .hero-label{font-size:12px; letter-spacing:0.08em; font-weight:700; opacity:0.75; margin-bottom:18px;}
+  .hero-ring-wrap{position:relative; width:170px; height:170px; margin-bottom:16px;}
+  .hero-value{font-size:44px; font-weight:800;}
+  .hero-unit{font-size:12px; opacity:0.7;}
+  .hero-verdict{font-size:19px; font-weight:700; margin-bottom:8px;}
+  .hero-desc{font-size:13px; opacity:0.8; line-height:1.5; max-width:280px;}
+
+  .secondary-stack{display:flex; flex-direction:column; gap:16px;}
+  .stat-card{display:flex; align-items:center; gap:14px;}
+  .stat-icon{width:44px;height:44px;border-radius:12px; display:flex; align-items:center; justify-content:center; flex-shrink:0;}
+  .stat-body{flex:1;}
+  .stat-label{font-size:12px; color:var(--ink-soft); font-weight:600; margin-bottom:2px;}
+  .stat-value{font-size:26px; font-weight:800; line-height:1;}
+  .stat-badge{display:inline-block; margin-top:6px; padding:3px 10px; border-radius:999px; font-size:11px; font-weight:700;}
+  .badge-good{background:var(--good-bg); color:var(--good);}
+  .badge-warn{background:var(--warn-bg); color:var(--warn);}
+  .badge-bad{background:var(--bad-bg); color:var(--bad);}
+
+  .footer-row{display:grid; grid-template-columns:repeat(3, 1fr); gap:12px;}
+  @media (max-width:700px){.footer-row{grid-template-columns:1fr;}}
+  .footer-stat{padding:16px;}
+  .footer-stat .flabel{font-size:10.5px; letter-spacing:0.06em; color:var(--ink-faint); font-weight:700; margin-bottom:6px;}
+  .footer-stat .fvalue{font-size:16px; font-weight:700;}
+
+  /* History page */
+  .logger-card{margin-bottom:16px;}
+  .logger-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; flex-wrap:wrap; gap:10px;}
+  .logger-head h3{font-size:15px; font-weight:700;}
+  .logger-status{display:flex; align-items:center; gap:7px; font-size:12px; font-weight:700; padding:6px 12px; border-radius:999px;}
+  .logger-status.running{background:var(--good-bg); color:var(--good);}
+  .logger-status.stopped{background:var(--bad-bg); color:var(--bad);}
+  .logger-grid{display:grid; grid-template-columns:repeat(4, 1fr); gap:14px;}
+  @media (max-width:800px){.logger-grid{grid-template-columns:1fr 1fr;}}
+  .logger-field label{display:block; font-size:11px; font-weight:700; color:var(--ink-soft); margin-bottom:6px;}
+  .logger-field select, .logger-field input{
+    width:100%; padding:9px 10px; border-radius:10px; border:1px solid var(--card-border);
+    background:rgba(255,255,255,0.8); font-family:inherit; font-size:13px; color:var(--ink);
+  }
+  .logger-field .readout{font-size:20px; font-weight:800;}
+  .logger-actions{display:flex; gap:8px; flex-wrap:wrap;}
+  .btn{
+    padding:9px 16px; border-radius:10px; border:none; font-family:inherit; font-size:12.5px; font-weight:700;
+    cursor:pointer;
+  }
+  .btn-primary{background:var(--blob-violet); color:#fff;}
+  .btn-ghost{background:rgba(255,255,255,0.7); color:var(--ink); border:1px solid var(--card-border);}
+  .btn-danger{background:var(--bad-bg); color:var(--bad);}
+
+  .history-grid{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
+  @media (max-width:700px){.history-grid{grid-template-columns:1fr;}}
+  .chart-caption{font-size:11.5px; color:var(--ink-faint); margin-top:2px; margin-bottom:14px;}
+  .chart-box{position:relative; height:180px;}
+
+  /* Settings page */
+  .settings-grid{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
+  @media (max-width:800px){.settings-grid{grid-template-columns:1fr;}}
+
+  .view-btn{
+    padding:7px 14px; border-radius:999px; font-size:12.5px; font-weight:700;
+    border:1px solid var(--card-border); background:rgba(255,255,255,0.6); color:var(--ink-soft);
+    cursor:pointer; font-family:inherit;
+  }
+  .view-btn.active{background:var(--blob-violet); color:#fff; border-color:var(--blob-violet);}
+
+  .alert-item{
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    padding:11px 4px; border-bottom:1px solid var(--card-border); font-size:13px;
+  }
+  .alert-item:last-child{border-bottom:none;}
+  .alert-item .a-desc{color:var(--ink);}
+  .alert-item .a-time{color:var(--ink-faint); font-size:11.5px; font-family:'JetBrains Mono', monospace; white-space:nowrap;}
+  .alert-tier-badge{padding:2px 9px; border-radius:999px; font-size:11px; font-weight:700; margin-right:8px;}
+  .alert-empty{color:var(--ink-faint); font-size:13px; padding:8px 4px;}
+  .settings-card h3{font-size:15px; font-weight:700; margin-bottom:4px;}
+  .settings-card p.hint{font-size:12.5px; color:var(--ink-soft); margin-bottom:16px; line-height:1.5;}
+  .field{margin-bottom:14px;}
+  .field label{display:block; font-size:12px; font-weight:700; color:var(--ink-soft); margin-bottom:6px;}
+  .field input{
+    width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--card-border);
+    background:rgba(255,255,255,0.8); font-family:inherit; font-size:13.5px; color:var(--ink);
+  }
+  .info-row{display:flex; justify-content:space-between; padding:9px 0; font-size:13px; border-bottom:1px solid var(--card-border);}
+  .info-row:last-child{border-bottom:none;}
+  .info-row .k{color:var(--ink-soft);}
+  .info-row .v{font-weight:700; font-family:'JetBrains Mono', monospace; font-size:12.5px;}
+
+  /* Mobile bottom tab bar */
+  .bottom-tabs{display:none;}
+  @media (max-width:768px){
+    .sidebar{
+      position:fixed; top:0; left:0; right:0; height:auto; width:100%;
+      flex-direction:row; align-items:center; justify-content:space-between;
+      padding:14px 16px; background:rgba(255,248,240,0.85); backdrop-filter:blur(10px);
+      z-index:10;
+    }
+    .nav-links, .device-card{display:none;}
+    .content{padding:80px 16px 120px;}
+    .bottom-tabs{
+      display:flex; position:fixed; bottom:0; left:0; right:0; z-index:10;
+      background:rgba(255,255,255,0.92); backdrop-filter:blur(14px);
+      border-top:1px solid var(--card-border);
+      padding:8px 12px calc(8px + env(safe-area-inset-bottom));
+    }
+    .bottom-tab{
+      flex:1; display:flex; flex-direction:column; align-items:center; gap:3px;
+      background:none; border:none; font-family:inherit; color:var(--ink-faint);
+      font-size:10.5px; font-weight:700; padding:6px; cursor:pointer;
+    }
+    .bottom-tab.active{color:var(--blob-violet);}
+  }
+</style>
+</head>
+<body>
+
+<div class="blob blob1"></div>
+<div class="blob blob2"></div>
+<div class="blob blob3"></div>
+
+<div class="app">
+
+  <nav class="sidebar">
+    <div class="brand">
+      <div class="brand-icon"><img src="data:image/png;base64,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" alt="ProtoCraft Electronics logo"></div>
+      <div><h1>ProtoCraft</h1><span>Climate Monitor</span></div>
+    </div>
+    <div class="nav-links">
+      <button class="nav-link active" data-page="dashboard">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9M5 10v10h14V10"/></svg>
+        Dashboard
+      </button>
+      <button class="nav-link" data-page="history">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+        History
+      </button>
+      <button class="nav-link" data-page="alerts">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Alerts
+      </button>
+      <button class="nav-link" data-page="settings">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Settings
+      </button>
+    </div>
+    <div class="device-card">
+      <div class="device-status"><span class="dot"></span>Device Online</div>
+      <div class="device-name">CLIMATE-01</div>
+      <div class="device-meta">ESP32 &middot; DHT11</div>
+      <div class="device-meta" id="sidebarHost">climate.local</div>
+    </div>
+  </nav>
+
+  <main class="content">
+
+    <!-- DASHBOARD -->
+    <section id="page-dashboard" class="page active">
+      <div class="page-head">
+        <h2>Climate overview</h2>
+        <p>Living room sensor node</p>
+      </div>
+
+      <div class="dash-grid">
+        <div class="hero-card">
+          <div class="hero-label">COMFORT SCORE</div>
+          <div class="hero-ring-wrap">
+            <svg width="170" height="170" viewBox="0 0 170 170">
+              <circle cx="85" cy="85" r="72" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="13"/>
+              <circle id="heroRing" cx="85" cy="85" r="72" fill="none" stroke="#4DD9AC" stroke-width="13"
+                stroke-linecap="round" stroke-dasharray="452.4" stroke-dashoffset="452.4"
+                transform="rotate(-90 85 85)" style="transition:stroke-dashoffset 0.8s ease, stroke 0.8s ease;"/>
+            </svg>
+            <div style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+              <div class="hero-value" id="heroScore">--</div>
+              <div class="hero-unit">out of 100</div>
+            </div>
+          </div>
+          <div class="hero-verdict" id="heroVerdict">Comfort: Great</div>
+          <div class="hero-desc" id="heroDesc">Temperature and humidity are both sitting in the ideal band right now.</div>
+        </div>
+
+        <div class="secondary-stack">
+          <div class="card stat-card">
+            <div class="stat-icon" style="background:#FFE8D6;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/></svg>
+            </div>
+            <div class="stat-body">
+              <div class="stat-label">Temperature</div>
+              <div class="stat-value" id="tempValue" style="color:#22C55E">24.6<span style="font-size:15px;">&deg;C</span></div>
+              <span class="stat-badge badge-good" id="tempBadge">Comfortable</span>
+            </div>
+          </div>
+          <div class="card stat-card">
+            <div class="stat-icon" style="background:#D2ECFB;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.69s-7 7.44-7 12a7 7 0 0 0 14 0c0-4.56-7-12-7-12Z"/></svg>
+            </div>
+            <div class="stat-body">
+              <div class="stat-label">Humidity</div>
+              <div class="stat-value" id="humValue" style="color:#2DD4BF">52<span style="font-size:15px;">% RH</span></div>
+              <span class="stat-badge badge-good" id="humBadge">Ideal</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer-row">
+        <div class="card footer-stat">
+          <div class="flabel">DEVICE</div>
+          <div class="fvalue" style="color:var(--good)">Online</div>
+        </div>
+        <div class="card footer-stat">
+          <div class="flabel">SENSOR</div>
+          <div class="fvalue">DHT11 active</div>
+        </div>
+        <div class="card footer-stat">
+          <div class="flabel">LAST UPDATE</div>
+          <div class="fvalue" id="lastUpdate">just now</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- HISTORY -->
+    <section id="page-history" class="page">
+      <div class="page-head">
+        <h2>History &amp; data logger</h2>
+        <p>Set how often readings are logged, and export what's recorded.</p>
+      </div>
+
+      <div class="card logger-card">
+        <div class="logger-head">
+          <h3>Data logger controls</h3>
+          <span class="logger-status running" id="loggerStatus">&#9679; Logging</span>
+        </div>
+        <div class="logger-grid">
+          <div class="logger-field">
+            <label>Keep history for</label>
+            <select id="durationSelect">
+              <option value="1">1 day</option>
+              <option value="3">3 days</option>
+              <option value="7" selected>7 days</option>
+              <option value="14">14 days</option>
+              <option value="30">30 days</option>
+            </select>
+          </div>
+          <div class="logger-field">
+            <label>Log every</label>
+            <select id="intervalSelect">
+              <option value="60">1 minute</option>
+              <option value="300" selected>5 minutes</option>
+              <option value="900">15 minutes</option>
+              <option value="1800">30 minutes</option>
+              <option value="3600">1 hour</option>
+            </select>
+          </div>
+          <div class="logger-field">
+            <label>Actions</label>
+            <div class="logger-actions">
+              <button class="btn btn-ghost" id="toggleLogging">Pause</button>
+              <button class="btn btn-danger" id="clearHistory">Clear</button>
+            </div>
+          </div>
+          <div class="logger-field">
+            <label>&nbsp;</label>
+            <button class="btn btn-primary" id="applySettingsBtn" style="width:100%;">Apply</button>
+          </div>
+        </div>
+        <div id="memoryNote" style="margin-top:12px; font-size:12px; color:var(--ink-soft); line-height:1.6;">
+          Raw storage: calculating&hellip;<br>
+          Chart resolution: calculating&hellip;
+        </div>
+        <div style="margin-top:16px;">
+          <button class="btn btn-primary" id="downloadCsvBtn">Download CSV</button>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:16px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+          <h3 style="font-size:15px; font-weight:700;">View range</h3>
+          <div id="viewRangeButtons" style="display:flex; gap:8px; flex-wrap:wrap;"></div>
+        </div>
+      </div>
+
+      <div class="history-grid">
+        <div class="card">
+          <h3 style="font-size:15px; font-weight:700;">Temperature history</h3>
+          <div class="chart-caption" id="tempCaption">Logged every 5 min &middot; rolling 24h window</div>
+          <div class="chart-box"><canvas id="tempHistoryChart"></canvas></div>
+        </div>
+        <div class="card">
+          <h3 style="font-size:15px; font-weight:700;">Humidity history</h3>
+          <div class="chart-caption" id="humCaption">Logged every 5 min &middot; rolling 24h window</div>
+          <div class="chart-box"><canvas id="humHistoryChart"></canvas></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ALERTS -->
+    <section id="page-alerts" class="page">
+      <div class="page-head">
+        <h2>Alerts</h2>
+        <p>Set what counts as comfortable, and see when it last wasn't.</p>
+      </div>
+
+      <div class="settings-grid" style="margin-bottom:16px;">
+        <div class="card settings-card">
+          <h3>Temperature thresholds</h3>
+          <p class="hint">Comfortable range shows green. Outside the warning range counts as danger.</p>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <div class="field"><label>Comfortable min (&deg;C)</label><input type="number" step="0.1" id="tempComfortMin"></div>
+            <div class="field"><label>Comfortable max (&deg;C)</label><input type="number" step="0.1" id="tempComfortMax"></div>
+            <div class="field"><label>Warning min (&deg;C)</label><input type="number" step="0.1" id="tempWarnMin"></div>
+            <div class="field"><label>Warning max (&deg;C)</label><input type="number" step="0.1" id="tempWarnMax"></div>
+          </div>
+        </div>
+        <div class="card settings-card">
+          <h3>Humidity thresholds</h3>
+          <p class="hint">Same idea, in % relative humidity.</p>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <div class="field"><label>Comfortable min (%)</label><input type="number" step="0.1" id="humComfortMin"></div>
+            <div class="field"><label>Comfortable max (%)</label><input type="number" step="0.1" id="humComfortMax"></div>
+            <div class="field"><label>Warning min (%)</label><input type="number" step="0.1" id="humWarnMin"></div>
+            <div class="field"><label>Warning max (%)</label><input type="number" step="0.1" id="humWarnMax"></div>
+          </div>
+        </div>
+      </div>
+      <div style="margin-bottom:16px;">
+        <button class="btn btn-primary" id="saveThresholdsBtn">Save thresholds</button>
+      </div>
+
+      <div class="card">
+        <h3 style="font-size:15px; font-weight:700; margin-bottom:4px;">Recent alerts</h3>
+        <p class="hint" style="margin-bottom:14px;">Logged only when a reading crosses from one tier to another, not on every reading.</p>
+        <div id="alertsList"></div>
+      </div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section id="page-settings" class="page">
+      <div class="page-head">
+        <h2>Settings</h2>
+        <p>Network and device configuration.</p>
+      </div>
+
+      <div class="settings-grid">
+        <div class="card settings-card">
+          <h3>WiFi network</h3>
+          <p class="hint">Currently connected to <strong id="currentSsid">HomeWiFi_5G</strong>. Enter a new network below to switch — the device restarts and reconnects, this page will drop momentarily.</p>
+          <div class="field">
+            <label for="newSsid">Network name</label>
+            <input type="text" id="newSsid" placeholder="Enter new SSID">
+          </div>
+          <div class="field">
+            <label for="newPass">Password</label>
+            <input type="password" id="newPass" placeholder="Enter password">
+          </div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn btn-primary" id="saveWifiBtn">Save &amp; reconnect</button>
+            <button class="btn btn-danger" id="forgetWifiBtn">Forget WiFi network</button>
+          </div>
+        </div>
+
+        <div class="card settings-card">
+          <h3>Device info</h3>
+          <p class="hint">Read-only status, useful if you're on mobile and the sidebar isn't visible.</p>
+          <div class="info-row"><span class="k">IP address</span><span class="v" id="infoIp">connecting&hellip;</span></div>
+          <div class="info-row"><span class="k">Hostname</span><span class="v" id="infoHostname">climate.local</span></div>
+          <div class="info-row"><span class="k">Sensor</span><span class="v">DHT11</span></div>
+          <div class="info-row"><span class="k">Uptime</span><span class="v" id="infoUptime">--:--:--</span></div>
+          <div class="info-row"><span class="k">Signal</span><span class="v" id="infoSignal">-- dBm</span></div>
+          <div class="info-row"><span class="k">Cloud logging</span><span class="v" id="infoCloud">--</span></div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<div class="bottom-tabs">
+  <button class="bottom-tab active" data-page="dashboard">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12l9-9 9 9M5 10v10h14V10"/></svg>
+    Dashboard
+  </button>
+  <button class="bottom-tab" data-page="history">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+    History
+  </button>
+  <button class="bottom-tab" data-page="alerts">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    Alerts
+  </button>
+  <button class="bottom-tab" data-page="settings">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    Settings
+  </button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+  // ---- Page navigation ----
+  function showPage(name){
+    document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + name));
+    document.querySelectorAll('.nav-link').forEach(b => b.classList.toggle('active', b.dataset.page === name));
+    document.querySelectorAll('.bottom-tab').forEach(b => b.classList.toggle('active', b.dataset.page === name));
+    if(name === 'alerts') fetchAlerts();
+  }
+  document.querySelectorAll('.nav-link, .bottom-tab').forEach(btn => {
+    btn.addEventListener('click', () => showPage(btn.dataset.page));
+  });
+
+  // ---- Shared state ----
+  let lastGoodConnection = true;
+  let secondsSinceUpdate = 0;
+  let settingsSyncedFromServer = false;
+
+  function setConnectionState(ok){
+    if(ok === lastGoodConnection) return;
+    lastGoodConnection = ok;
+    document.querySelectorAll('.dot').forEach(dot => {
+      dot.style.background = ok ? 'var(--good)' : 'var(--bad)';
+      dot.style.boxShadow = ok ? '0 0 0 3px rgba(15,157,108,0.18)' : '0 0 0 3px rgba(194,46,46,0.18)';
+    });
+    document.querySelectorAll('.device-status').forEach(el => {
+      el.style.color = ok ? 'var(--good)' : 'var(--bad)';
+      el.childNodes[el.childNodes.length-1].textContent = ok ? 'Device Online' : 'Reconnecting\u2026';
+    });
+  }
+
+  function fmtUptime(totalSeconds){
+    const h = Math.floor(totalSeconds/3600).toString().padStart(2,'0');
+    const m = Math.floor((totalSeconds%3600)/60).toString().padStart(2,'0');
+    const s = Math.floor(totalSeconds%60).toString().padStart(2,'0');
+    return h+':'+m+':'+s;
+  }
+  function fmtChartTime(unixSeconds, spansMultipleDays){
+    const d = new Date(unixSeconds * 1000);
+    const hm = d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+    if(!spansMultipleDays) return hm;
+    const dm = (d.getDate()).toString().padStart(2,'0') + '/' + (d.getMonth()+1).toString().padStart(2,'0');
+    return dm + ' ' + hm;
+  }
+
+  // ---- Dashboard: gauge + stat cards ----
+  const heroRing = document.getElementById('heroRing');
+  const HERO_CIRC = 452.4;
+
+  // Defaults match the firmware's defaults, overwritten by fetchThresholds()
+  // once /api/thresholds responds - so the dashboard never colors anything
+  // wrong while waiting on that first fetch.
+  let thresholds = {
+    temp_comfort_min: 20, temp_comfort_max: 26, temp_warn_min: 17, temp_warn_max: 35,
+    hum_comfort_min: 40, hum_comfort_max: 60, hum_warn_min: 25, hum_warn_max: 95
+  };
+
+  function tierFor(value, goodMin, goodMax, okMin, okMax){
+    if(value >= goodMin && value <= goodMax) return 'good';
+    if(value >= okMin && value <= okMax) return 'warn';
+    return 'bad';
+  }
+
+  function render(temp, hum){
+    if(temp === null || hum === null){ return; }
+
+    const tempTier = tierFor(temp, thresholds.temp_comfort_min, thresholds.temp_comfort_max, thresholds.temp_warn_min, thresholds.temp_warn_max);
+    const humTier = tierFor(hum, thresholds.hum_comfort_min, thresholds.hum_comfort_max, thresholds.hum_warn_min, thresholds.hum_warn_max);
+    const tierScore = { good: 100, warn: 60, bad: 20 };
+    const comfortScore = Math.round((tierScore[tempTier] + tierScore[humTier]) / 2);
+
+    heroRing.style.strokeDashoffset = HERO_CIRC - (comfortScore/100)*HERO_CIRC;
+    heroRing.style.stroke = comfortScore >= 85 ? '#4DD9AC' : comfortScore >= 55 ? '#F59E0B' : '#EF4444';
+    document.getElementById('heroScore').textContent = comfortScore;
+
+    const heroVerdict = document.getElementById('heroVerdict');
+    const heroDesc = document.getElementById('heroDesc');
+    if(comfortScore >= 85){
+      heroVerdict.textContent = 'Comfort: Great';
+      heroDesc.textContent = "Temperature and humidity are both sitting in the ideal band right now.";
+    } else if(comfortScore >= 55){
+      heroVerdict.textContent = 'Comfort: OK';
+      heroDesc.textContent = "Conditions are reasonable but drifting outside the ideal band.";
+    } else {
+      heroVerdict.textContent = 'Comfort: Poor';
+      heroDesc.textContent = "Temperature or humidity is well outside the comfortable range.";
+    }
+
+    const tempColor = tempTier === 'good' ? '#22C55E' : tempTier === 'warn' ? '#F59E0B' : '#EF4444';
+    const humColor = humTier === 'good' ? '#2DD4BF' : humTier === 'warn' ? '#3B82F6' : '#EF4444';
+    document.getElementById('tempValue').innerHTML = temp.toFixed(1) + '<span style="font-size:15px;">\u00B0C</span>';
+    document.getElementById('tempValue').style.color = tempColor;
+    document.getElementById('humValue').innerHTML = Math.round(hum) + '<span style="font-size:15px;">% RH</span>';
+    document.getElementById('humValue').style.color = humColor;
+
+    const tempBadge = document.getElementById('tempBadge');
+    tempBadge.textContent = tempTier === 'good' ? 'Comfortable' : tempTier === 'warn' ? (temp < thresholds.temp_comfort_min ? 'A bit cool' : 'A bit warm') : (temp < thresholds.temp_warn_min ? 'Too cold' : 'Too hot');
+    tempBadge.className = 'stat-badge badge-' + tempTier;
+    const humBadge = document.getElementById('humBadge');
+    humBadge.textContent = humTier === 'good' ? 'Ideal' : humTier === 'warn' ? (hum < thresholds.hum_comfort_min ? 'A bit dry' : 'A bit humid') : (hum < thresholds.hum_warn_min ? 'Too dry' : 'Too humid');
+    humBadge.className = 'stat-badge badge-' + humTier;
+  }
+
+  // ---- Charts ----
+  const tempCtx = document.getElementById('tempHistoryChart').getContext('2d');
+  const humCtx = document.getElementById('humHistoryChart').getContext('2d');
+  const tempFill = tempCtx.createLinearGradient(0,0,0,180);
+  tempFill.addColorStop(0,'rgba(251,146,60,0.30)'); tempFill.addColorStop(1,'rgba(251,146,60,0)');
+  const humFill = humCtx.createLinearGradient(0,0,0,180);
+  humFill.addColorStop(0,'rgba(59,130,246,0.28)'); humFill.addColorStop(1,'rgba(59,130,246,0)');
+
+  const commonXScale = { grid:{display:false}, ticks:{color:'#9C96AD', font:{size:10}, maxTicksLimit:6, autoSkip:true} };
+
+  const tempChart = new Chart(tempCtx, { type:'line', data:{ labels:[], datasets:[{ data:[], borderColor:'#FB923C', backgroundColor:tempFill, borderWidth:2.5, tension:0.35, fill:true, pointRadius:0 }] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label:(c)=>c.parsed.y.toFixed(1)+' \u00B0C'}}}, scales:{ x:commonXScale, y:{grid:{color:'rgba(90,60,150,0.06)'}, ticks:{color:'#9C96AD', font:{size:10}}} } } });
+  const humChart = new Chart(humCtx, { type:'line', data:{ labels:[], datasets:[{ data:[], borderColor:'#3B82F6', backgroundColor:humFill, borderWidth:2.5, tension:0.35, fill:true, pointRadius:0 }] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label:(c)=>c.parsed.y+'% RH'}}}, scales:{ x:commonXScale, y:{min:0, max:100, grid:{color:'rgba(90,60,150,0.06)'}, ticks:{color:'#9C96AD', font:{size:10}}} } } });
+
+  // ---- API polling ----
+  async function fetchNow(){
+    try{
+      const res = await fetch('/api/now');
+      if(!res.ok) throw new Error('bad response');
+      const data = await res.json();
+      setConnectionState(true);
+      secondsSinceUpdate = 0;
+
+      if(data.temp !== null && data.hum !== null) render(data.temp, data.hum);
+      document.getElementById('lastUpdate').textContent = 'just now';
+
+      const ipEls = [document.getElementById('sidebarHost')];
+      ipEls.forEach(el => { if(el) el.textContent = data.hostname; });
+
+      const infoIp = document.getElementById('infoIp');
+      if(infoIp){
+        infoIp.textContent = data.ip;
+        document.getElementById('infoHostname').textContent = data.hostname;
+        document.getElementById('infoUptime').textContent = fmtUptime(data.uptime);
+        document.getElementById('infoSignal').textContent = '\u2212' + Math.abs(data.rssi) + ' dBm';
+        document.getElementById('infoCloud').textContent = data.cloud_logging ? 'Enabled' : 'Disabled';
+        document.getElementById('infoCloud').style.color = data.cloud_logging ? 'var(--good)' : 'var(--ink-faint)';
+        document.getElementById('currentSsid').textContent = data.ssid || 'unknown';
+      }
+
+      const loggerStatus = document.getElementById('loggerStatus');
+      if(loggerStatus){
+        loggerStatus.textContent = data.logging_enabled ? '\u25CF Logging' : '\u25CF Paused';
+        loggerStatus.className = 'logger-status ' + (data.logging_enabled ? 'running' : 'stopped');
+        document.getElementById('toggleLogging').textContent = data.logging_enabled ? 'Pause' : 'Resume';
+      }
+
+      if(!settingsSyncedFromServer){
+        settingsSyncedFromServer = true;
+        const durationSelect = document.getElementById('durationSelect');
+        const intervalSelect = document.getElementById('intervalSelect');
+        if(durationSelect) durationSelect.value = String(data.retention_days);
+        if(intervalSelect) intervalSelect.value = String(data.interval_sec);
+        updateLoggerMath();
+        buildViewRangeButtons(data.retention_days);
+      }
+    } catch(err){
+      setConnectionState(false);
+    }
+  }
+
+  // ---- View range (independent of the logging/retention settings - this
+  // just controls how much of what's already retained gets charted) ----
+  let currentViewDays = null; // null = full retention, set once retention is known
+  let retentionDaysKnown = 7;
+
+  function buildViewRangeButtons(retentionDays){
+    retentionDaysKnown = retentionDays;
+    const options = [
+      { label: 'Today', days: 1 },
+      { label: '3 days', days: 3 },
+      { label: '7 days', days: 7 },
+      { label: 'Full (' + retentionDays + 'd)', days: retentionDays }
+    ].filter(o => o.days <= retentionDays || o.days === retentionDays);
+    // de-dupe (e.g. retention itself set to 3 would otherwise show two "3 day" style buttons)
+    const seen = new Set();
+    const unique = options.filter(o => { if(seen.has(o.days)) return false; seen.add(o.days); return true; });
+
+    if(currentViewDays === null || currentViewDays > retentionDays) currentViewDays = retentionDays;
+
+    const container = document.getElementById('viewRangeButtons');
+    container.innerHTML = '';
+    unique.forEach(o => {
+      const btn = document.createElement('button');
+      btn.className = 'view-btn' + (o.days === currentViewDays ? ' active' : '');
+      btn.textContent = o.label;
+      btn.addEventListener('click', () => {
+        currentViewDays = o.days;
+        buildViewRangeButtons(retentionDaysKnown);
+        fetchHistory();
+      });
+      container.appendChild(btn);
+    });
+  }
+
+  async function fetchHistory(){
+    try{
+      const url = currentViewDays ? ('/api/history?days=' + currentViewDays) : '/api/history';
+      const res = await fetch(url);
+      if(!res.ok) throw new Error('bad response');
+      const data = await res.json();
+      if(retentionDaysKnown !== data.retention_days) buildViewRangeButtons(data.retention_days);
+      const spansMultipleDays = (data.view_days || data.retention_days || 1) > 1;
+      const labels = data.points.map(p => fmtChartTime(p.ts, spansMultipleDays));
+
+      tempChart.data.labels = labels;
+      tempChart.data.datasets[0].data = data.points.map(p => p.temp);
+      tempChart.update('none');
+
+      humChart.data.labels = labels;
+      humChart.data.datasets[0].data = data.points.map(p => p.hum);
+      humChart.update('none');
+    } catch(err){
+      setConnectionState(false);
+    }
+  }
+
+  // ---- Thresholds (Alerts tab) ----
+  const thresholdFields = ['temp_comfort_min','temp_comfort_max','temp_warn_min','temp_warn_max','hum_comfort_min','hum_comfort_max','hum_warn_min','hum_warn_max'];
+  const thresholdInputIds = { temp_comfort_min:'tempComfortMin', temp_comfort_max:'tempComfortMax', temp_warn_min:'tempWarnMin', temp_warn_max:'tempWarnMax', hum_comfort_min:'humComfortMin', hum_comfort_max:'humComfortMax', hum_warn_min:'humWarnMin', hum_warn_max:'humWarnMax' };
+
+  async function fetchThresholds(){
+    try{
+      const res = await fetch('/api/thresholds');
+      if(!res.ok) throw new Error('bad response');
+      const data = await res.json();
+      thresholds = data;
+      thresholdFields.forEach(f => {
+        const el = document.getElementById(thresholdInputIds[f]);
+        if(el) el.value = data[f];
+      });
+    } catch(err){}
+  }
+
+  document.getElementById('saveThresholdsBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('saveThresholdsBtn');
+    btn.disabled = true; btn.textContent = 'Saving\u2026';
+    const body = new URLSearchParams();
+    thresholdFields.forEach(f => {
+      const el = document.getElementById(thresholdInputIds[f]);
+      if(el) body.set(f, el.value);
+    });
+    try{
+      await fetch('/api/thresholds', { method:'POST', body });
+      await fetchThresholds();
+    } catch(err){}
+    btn.disabled = false; btn.textContent = 'Saved';
+    setTimeout(() => { btn.textContent = 'Save thresholds'; }, 1500);
+  });
+
+  // ---- Alerts feed ----
+  function tierName(n){ return n == 0 ? 'good' : n == 1 ? 'warn' : 'bad'; }
+  function tierLabel(n){ return n == 0 ? 'Comfortable' : n == 1 ? 'Warning' : 'Danger'; }
+
+  async function fetchAlerts(){
+    try{
+      const res = await fetch('/api/alerts');
+      if(!res.ok) throw new Error('bad response');
+      const data = await res.json();
+      const list = document.getElementById('alertsList');
+      if(!data.events || data.events.length === 0){
+        list.innerHTML = '<div class="alert-empty">No tier changes recorded yet.</div>';
+        return;
+      }
+      list.innerHTML = data.events.slice().reverse().map(e => {
+        const metricName = e.metric === 'T' ? 'Temperature' : 'Humidity';
+        const unit = e.metric === 'T' ? '\u00B0C' : '% RH';
+        const toTier = tierName(e.to_tier);
+        const d = new Date(e.ts * 1000);
+        const timeStr = d.toLocaleDateString() + ' ' + d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+        return '<div class="alert-item">' +
+          '<span class="a-desc"><span class="alert-tier-badge badge-' + toTier + '">' + tierLabel(e.to_tier) + '</span>' +
+          metricName + ' crossed to ' + tierLabel(e.to_tier).toLowerCase() + ': ' + e.value.toFixed(1) + unit + '</span>' +
+          '<span class="a-time">' + timeStr + '</span></div>';
+      }).join('');
+    } catch(err){}
+  }
+
+  // ---- Logger settings math (client-side estimate, informational only) ----
+  const durationSelect = document.getElementById('durationSelect');
+  const intervalSelect = document.getElementById('intervalSelect');
+  const memoryNote = document.getElementById('memoryNote');
+  const tempCaption = document.getElementById('tempCaption');
+  const humCaption = document.getElementById('humCaption');
+
+  function updateLoggerMath(){
+    const days = parseInt(durationSelect.value, 10);
+    const intervalSec = parseInt(intervalSelect.value, 10);
+    const rawPoints = Math.round((days * 86400) / intervalSec);
+    const kb = ((rawPoints * 8) / 1024).toFixed(1);
+    const chartBucketSec = Math.round((days * 86400) / 480);
+    const bucketMin = Math.max(1, Math.round(chartBucketSec / 60));
+
+    memoryNote.innerHTML =
+      'Raw storage: \u2248' + rawPoints.toLocaleString() + ' readings over ' + days + ' day' + (days>1?'s':'') + ' (~' + kb + ' KB on flash)<br>' +
+      'Chart resolution: about 1 point every ' + bucketMin + ' min (auto-downsampled for smooth rendering)';
+
+    const intervalLabel = intervalSelect.options[intervalSelect.selectedIndex].text;
+    const durationLabel = durationSelect.options[durationSelect.selectedIndex].text;
+    const caption = 'Logged every ' + intervalLabel.toLowerCase() + ' \u00B7 keeping ' + durationLabel;
+    if(tempCaption) tempCaption.textContent = caption;
+    if(humCaption) humCaption.textContent = caption;
+  }
+  durationSelect.addEventListener('change', updateLoggerMath);
+  intervalSelect.addEventListener('change', updateLoggerMath);
+  updateLoggerMath();
+
+  // ---- Actions ----
+  document.getElementById('applySettingsBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('applySettingsBtn');
+    btn.disabled = true; btn.textContent = 'Applying\u2026';
+    try{
+      const body = new URLSearchParams();
+      body.set('interval_sec', intervalSelect.value);
+      body.set('retention_days', durationSelect.value);
+      await fetch('/api/settings', { method:'POST', body });
+      await fetchHistory();
+    } catch(err){}
+    btn.disabled = false; btn.textContent = 'Applied';
+    setTimeout(() => { btn.textContent = 'Apply'; }, 1500);
+  });
+
+  document.getElementById('toggleLogging').addEventListener('click', async (e) => {
+    const nowPaused = e.target.textContent.trim() === 'Pause';
+    const body = new URLSearchParams();
+    body.set('enabled', nowPaused ? 'false' : 'true');
+    try{ await fetch('/api/settings', { method:'POST', body }); } catch(err){}
+    fetchNow();
+  });
+
+  document.getElementById('clearHistory').addEventListener('click', async () => {
+    if(!confirm('This deletes all saved history from the device. This cannot be undone. Continue?')) return;
+    try{
+      await fetch('/api/history/clear', { method:'POST' });
+      await fetchHistory();
+    } catch(err){}
+  });
+
+  document.getElementById('downloadCsvBtn').addEventListener('click', () => {
+    window.location.href = '/export.csv';
+  });
+
+  document.getElementById('saveWifiBtn').addEventListener('click', async () => {
+    const ssid = document.getElementById('newSsid').value.trim();
+    const pass = document.getElementById('newPass').value;
+    if(!ssid){ alert('Enter a network name first.'); return; }
+    if(!confirm('Save this network and restart the device? The dashboard will drop momentarily while it reconnects.')) return;
+    const body = new URLSearchParams();
+    body.set('ssid', ssid); body.set('pass', pass);
+    try{ await fetch('/api/wifi', { method:'POST', body }); } catch(err){}
+  });
+
+  document.getElementById('forgetWifiBtn').addEventListener('click', async () => {
+    if(!confirm('This clears the saved WiFi network and restarts into setup mode. You\'ll need to reconnect it from the ProtoCraft-Setup access point. Continue?')) return;
+    try{ await fetch('/api/forget-wifi', { method:'POST' }); } catch(err){}
+  });
+
+  // ---- Boot ----
+  fetchNow();
+  fetchHistory();
+  fetchThresholds();
+  setInterval(fetchNow, 5000);
+  setInterval(fetchHistory, 5 * 60 * 1000);
+  setInterval(() => {
+    secondsSinceUpdate++;
+    if(!lastGoodConnection) return;
+    const lu = document.getElementById('lastUpdate');
+    if(lu) lu.textContent = secondsSinceUpdate < 2 ? 'just now' : secondsSinceUpdate + 's ago';
+  }, 1000);
+
+</script>
+</body>
+</html>
