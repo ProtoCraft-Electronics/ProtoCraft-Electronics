@@ -115,7 +115,7 @@ Notes:
    ```cpp
    #define MQTT_HOST "192.168.1.50"     // your Home Assistant IP address
    #define MQTT_PORT 1883
-   #define MQTT_USER "climate"          // the user from step 5
+   #define MQTT_USER "climate"          // the user from step 2 above
    #define MQTT_PASS "your-password"
    ```
 
