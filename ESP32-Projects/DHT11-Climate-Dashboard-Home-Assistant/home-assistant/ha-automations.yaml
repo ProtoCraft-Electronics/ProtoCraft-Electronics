@@ -1,0 +1,67 @@
+# Climate Monitor fan automations for Home Assistant
+#
+# Replace sensor.climate_monitor_temperature and switch.corner_fan with your own
+# entity IDs. Check them under Settings, Entities.
+#
+# The DHT11 reports whole degrees, so "above 27" fires when the reading reaches 28
+# and "below 25" fires when it reaches 24. Between them the fan keeps its state.
+
+- id: climate_monitor_fan_on_above_27
+  alias: "Fan on above 27"
+  description: "Turn the fan on when the room goes above 27. Pair with the off automation below."
+  mode: single
+  triggers:
+    - trigger: numeric_state
+      entity_id: sensor.climate_monitor_temperature
+      above: 27
+  actions:
+    - action: switch.turn_on
+      target:
+        entity_id: switch.corner_fan
+
+- id: climate_monitor_fan_off_below_25
+  alias: "Fan off below 25"
+  description: "Turn the fan off when the room drops below 25. Between 25 and 27 the fan keeps its state."
+  mode: single
+  triggers:
+    - trigger: numeric_state
+      entity_id: sensor.climate_monitor_temperature
+      below: 25
+  actions:
+    - action: switch.turn_off
+      target:
+        entity_id: switch.corner_fan
+
+# ---------------------------------------------------------------------------
+# The problem version: one threshold.
+#
+# Do not use this. It is here so you can reproduce the chatter. The DHT11 reports
+# whole degrees, so the line sits at 26.5, between 26 and 27. Every time the reading
+# hops across it, one of these fires and the fan switches. (A line at exactly 26
+# would not chatter: above 26 fires at 27, below 26 fires at 25.) Replace the two
+# automations above with these two to see it, then change back.
+#
+# - id: climate_monitor_fan_on_above_26_5
+#   alias: "Fan on above 26.5 (chatters)"
+#   mode: single
+#   triggers:
+#     - trigger: numeric_state
+#       entity_id: sensor.climate_monitor_temperature
+#       above: 26.5
+#   actions:
+#     - action: switch.turn_on
+#       target:
+#         entity_id: switch.corner_fan
+#
+# - id: climate_monitor_fan_off_below_26_5
+#   alias: "Fan off below 26.5 (chatters)"
+#   mode: single
+#   triggers:
+#     - trigger: numeric_state
+#       entity_id: sensor.climate_monitor_temperature
+#       below: 26.5
+#   actions:
+#     - action: switch.turn_off
+#       target:
+#         entity_id: switch.corner_fan
+# ---------------------------------------------------------------------------
