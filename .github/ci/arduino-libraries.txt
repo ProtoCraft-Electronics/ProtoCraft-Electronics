@@ -1,0 +1,13 @@
+# Arduino libraries CI installs before compiling the sketches.
+# One Library Manager name per line. Dependencies install automatically.
+# When a new project needs a library, add it here in the same PR.
+ArduinoJson
+DHT sensor library
+Adafruit Unified Sensor
+Adafruit GFX Library
+Adafruit SSD1306
+ESP Async WebServer
+Async TCP
+SinricPro
+FastLED
+FauxmoESP

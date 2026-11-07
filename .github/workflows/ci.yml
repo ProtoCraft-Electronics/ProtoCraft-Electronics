@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  conventions:
+    name: Repo conventions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check conventions
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            python3 .github/scripts/check_conventions.py \
+              --commits "${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
+          else
+            python3 .github/scripts/check_conventions.py
+          fi
+
+  compile:
+    name: Compile sketches
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: arduino/setup-arduino-cli@v2
+
+      - name: Cache cores and libraries
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.arduino15
+            ~/Arduino/libraries
+          key: arduino-${{ hashFiles('.github/ci/arduino-libraries.txt') }}-${{ github.run_id }}
+          restore-keys: arduino-${{ hashFiles('.github/ci/arduino-libraries.txt') }}-
+
+      - name: Install cores
+        run: |
+          arduino-cli config init --overwrite
+          arduino-cli config add board_manager.additional_urls \
+            https://espressif.github.io/arduino-esp32/package_esp32_index.json \
+            https://github.com/stm32duino/BoardManagerFiles/raw/main/package_stmicroelectronics_index.json
+          arduino-cli core update-index
+          arduino-cli core install esp32:esp32
+          arduino-cli core install STMicroelectronics:stm32
+
+      - name: Install libraries
+        run: |
+          arduino-cli lib update-index
+          grep -vE '^\s*(#|$)' .github/ci/arduino-libraries.txt | tr '\n' '\0' | xargs -0 arduino-cli lib install
+
+      - name: Compile
+        run: python3 .github/scripts/compile_sketches.py
