@@ -102,7 +102,7 @@ Notes:
 
 ## Set up the MQTT broker in Home Assistant
 
-1. In Home Assistant, open Settings, Add-ons, Add-on store, and install **Mosquitto broker**. Start it, and turn on "Start on boot".
+1. In Home Assistant, open Settings, Apps (called Add-ons in older versions), open the store, and install **Mosquitto broker**. Start it, and turn on "Start on boot".
 2. Create a user for the board. Open Settings, People, Users, add a user (for example `climate`) and note the password. A dedicated user keeps the broker login separate from your own account.
 3. Open Settings, Devices and services. Home Assistant normally offers to add the **MQTT** integration as soon as the broker runs. Accept it. If it does not appear, choose Add integration, search for MQTT and select the Mosquitto broker.
 4. Note the IP address of your Home Assistant machine (Settings, System, Network). You will put it in `secrets.h`. A fixed address, set in your router as a DHCP reservation, avoids surprises later.
@@ -165,7 +165,7 @@ To add them:
 1. Open Settings, Automations and scenes, Create automation, then the three-dot menu and **Edit in YAML**.
 2. Paste one automation, replace the placeholders (see the next section) and save. Repeat for the second one.
 3. Alternatively, paste the file into your `automations.yaml`. If you already have automations there, merge the entries into the existing list and do not replace the file.
-4. Test by warming the sensor, or temporarily lower the thresholds, and watch the fan switch.
+4. Test by warming the sensor, or temporarily lower the thresholds, and watch the fan switch. The reading must reach 28 to switch the fan on, and 24 to switch it off, because a DHT11 reports whole degrees. You can follow each run under Settings, Automations and scenes, then the automation's Traces.
 
 ## Adapting it to your setup
 
@@ -195,6 +195,7 @@ A numeric state trigger fires when the value crosses the threshold, not while it
 
 | Symptom | Likely cause and fix |
 | --- | --- |
+| Compile error, `icon_bitmap.h: No such file or directory` | Keep the whole `DHT11-Climate-Dashboard-HA` folder together. `icon_bitmap.h` and `secrets.h` must sit next to the `.ino`, and the folder name must match the `.ino` name. |
 | Sketch does not compile, `secrets.h` not found | Copy `secrets.h.example` to `secrets.h` in the sketch folder. |
 | Compile error about `PubSubClient.h` | Install PubSubClient by Nick O'Leary in the Library Manager. |
 | Other missing header errors | Install the libraries in the table above. Make sure ESPAsyncWebServer and AsyncTCP are the ESP32Async versions. |
