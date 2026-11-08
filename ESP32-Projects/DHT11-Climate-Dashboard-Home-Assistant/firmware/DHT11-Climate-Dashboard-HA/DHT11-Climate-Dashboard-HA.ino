@@ -26,9 +26,14 @@
     Push button between GPIO27 and GND (internal pull-up, no resistor
     needed). Hold 5 seconds to forget the saved WiFi network.
     Status LED on GPIO2 for button-hold feedback.
+    Optional BME280 breakout on the same I2C bus as the OLED:
+      VIN -> 3V3, GND -> GND, SDA -> GPIO21, SCL -> GPIO22.
+      Address 0x76 or 0x77, both are tried at boot. Set BME280_ENABLED
+      to 0 below if you do not have one fitted.
 
   LIBRARIES (Arduino Library Manager)
     DHT sensor library        by Adafruit
+    Adafruit BME280 Library   by Adafruit (only if BME280_ENABLED is 1)
     Adafruit Unified Sensor   by Adafruit
     ESPAsyncWebServer         by ESP32Async
     AsyncTCP                  by ESP32Async
@@ -68,6 +73,7 @@
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+#include <Adafruit_BME280.h>
 #include "icon_bitmap.h"
 #include "secrets.h"
 #if __has_include("google_root_ca.h")
@@ -79,6 +85,14 @@
 #define DHTPIN 4
 #define DHTTYPE DHT11
 DHT dht(DHTPIN, DHTTYPE);
+
+// Optional BME280 (temperature, humidity, pressure) next to the DHT11, so the
+// two sensors can be compared on the same board. It shares the OLED I2C bus.
+// Set to 0 to leave it out entirely.
+#define BME280_ENABLED 1
+Adafruit_BME280 bme;
+bool bmeAvailable = false;
+float bmeTemp = NAN, bmeHum = NAN, bmePres = NAN;   // pressure in hPa
 
 #define RESET_PIN 27
 #define STATUS_LED 2
@@ -466,7 +480,7 @@ bool publishDiscovery(const char* key, const char* name, const char* devClass,
   dev["identifiers"].to<JsonArray>().add(mqttDeviceId);
   dev["name"] = MQTT_DEVICE_NAME;
   dev["manufacturer"] = "ProtoCraft";
-  dev["model"] = "ESP32 + DHT11";
+  dev["model"] = BME280_ENABLED ? "ESP32 + DHT11 + BME280" : "ESP32 + DHT11";
   dev["configuration_url"] = MQTT_CONFIG_URL;
 
   String payload;
@@ -491,6 +505,13 @@ bool connectMqtt() {
   publishDiscovery("humidity", "Humidity", "humidity", "%", "humidity", "", "");
   publishDiscovery("comfort_score", "Comfort score", "", "", "comfort", "", "mdi:emoticon-happy-outline");
   publishDiscovery("wifi_signal", "WiFi signal", "signal_strength", "dBm", "rssi", "diagnostic", "");
+#if BME280_ENABLED
+  if (bmeAvailable) {
+    publishDiscovery("bme_temperature", "BME280 temperature", "temperature", "°C", "bme_temperature", "", "");
+    publishDiscovery("bme_humidity", "BME280 humidity", "humidity", "%", "bme_humidity", "", "");
+    publishDiscovery("bme_pressure", "BME280 pressure", "atmospheric_pressure", "hPa", "bme_pressure", "", "");
+  }
+#endif
   mqtt.publish(mqttAvailTopic.c_str(), "online", true);
   return true;
 }
@@ -501,6 +522,13 @@ void publishMqttState() {
   doc["humidity"] = round(currentHum * 10) / 10.0;
   doc["comfort"] = comfortScore(currentTemp, currentHum);
   doc["rssi"] = WiFi.RSSI();
+#if BME280_ENABLED
+  if (bmeAvailable && !isnan(bmeTemp)) {
+    doc["bme_temperature"] = round(bmeTemp * 100) / 100.0;
+    doc["bme_humidity"] = round(bmeHum * 10) / 10.0;
+    doc["bme_pressure"] = round(bmePres * 10) / 10.0;
+  }
+#endif
   String payload;
   serializeJson(doc, payload);
   mqtt.publish(mqttStateTopic.c_str(), payload.c_str());
@@ -786,6 +814,13 @@ void setupDashboardRoutes() {
     if (isnan(currentTemp) || isnan(currentHum)) { doc["temp"] = nullptr; doc["hum"] = nullptr; }
     else { doc["temp"] = round(currentTemp * 10) / 10.0; doc["hum"] = round(currentHum * 10) / 10.0; }
     doc["rssi"] = WiFi.RSSI();
+#if BME280_ENABLED
+    if (bmeAvailable && !isnan(bmeTemp)) {
+      doc["bme_temp"] = round(bmeTemp * 100) / 100.0;
+      doc["bme_hum"] = round(bmeHum * 10) / 10.0;
+      doc["bme_pres"] = round(bmePres * 10) / 10.0;
+    }
+#endif
     doc["uptime"] = (millis() - bootMillis) / 1000;
     doc["ip"] = WiFi.localIP().toString();
     doc["hostname"] = "climate.local";
@@ -1050,6 +1085,22 @@ void setup() {
 
   dht.begin();
 
+#if BME280_ENABLED
+  // Forced mode: one measurement per read, then the chip sleeps. That keeps
+  // self-heating negligible, which matters when comparing against the DHT11.
+  bmeAvailable = bme.begin(0x76, &Wire) || bme.begin(0x77, &Wire);
+  if (bmeAvailable) {
+    bme.setSampling(Adafruit_BME280::MODE_FORCED,
+                    Adafruit_BME280::SAMPLING_X4,    // temperature
+                    Adafruit_BME280::SAMPLING_X4,    // pressure
+                    Adafruit_BME280::SAMPLING_X4,    // humidity
+                    Adafruit_BME280::FILTER_OFF);
+    Serial.println("[bme280] found");
+  } else {
+    Serial.println("[bme280] not found at 0x76 or 0x77 - check wiring, continuing without it");
+  }
+#endif
+
   if (!LittleFS.begin(true)) {
     Serial.println("[fs] LittleFS mount failed");
   } else if (!LittleFS.exists(LOG_DIR)) {
@@ -1104,6 +1155,16 @@ void loop() {
     float t = dht.readTemperature();
     if (!isnan(h) && !isnan(t)) { currentTemp = t; currentHum = h; checkAlertCrossings(t, h); updateStatusScreen(); }
     else Serial.println("[dht11] read failed, keeping last good value");
+
+#if BME280_ENABLED
+    if (bmeAvailable && bme.takeForcedMeasurement()) {
+      float bt = bme.readTemperature();
+      float bh = bme.readHumidity();
+      float bp = bme.readPressure() / 100.0F;   // Pa to hPa
+      if (!isnan(bt) && !isnan(bh) && !isnan(bp)) { bmeTemp = bt; bmeHum = bh; bmePres = bp; }
+      else Serial.println("[bme280] read failed, keeping last good value");
+    }
+#endif
   }
 
   mqttTick(now);

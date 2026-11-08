@@ -30,6 +30,7 @@ This guide is self-contained. You do not need the base README to follow it.
 - An availability topic with a last will, so the entities show as unavailable when the board goes offline
 - The device page in Home Assistant links to the dashboard at `http://climate.local`
 - A pair of example automations in `home-assistant/ha-automations.yaml`
+- Optional BME280: three more entities (BME280 temperature, humidity and pressure) next to the DHT11 ones, for comparing the two sensors. Set `BME280_ENABLED` to 0 near the top of the sketch to leave it out
 - `/api/now` on the board also reports `mqtt_enabled` and `mqtt_connected`, which helps when debugging
 
 MQTT is optional. Leave `MQTT_HOST` empty in `secrets.h` and the sketch behaves like the base project.
@@ -69,6 +70,10 @@ MQTT is optional. Leave `MQTT_HOST` empty in `secrets.h` and the sketch behaves 
 | OLED (optional) | GND | GND |
 | OLED (optional) | SDA | GPIO21 |
 | OLED (optional) | SCL | GPIO22 |
+| BME280 (optional) | VIN | 3.3V |
+| BME280 (optional) | GND | GND |
+| BME280 (optional) | SDA | GPIO21 (shared with the OLED) |
+| BME280 (optional) | SCL | GPIO22 (shared with the OLED) |
 
 Notes:
 
@@ -96,6 +101,7 @@ Notes:
    | AsyncTCP | ESP32Async |
    | ArduinoJson (version 7) | Benoit Blanchon |
    | **PubSubClient** (new for this project) | Nick O'Leary |
+   | **Adafruit BME280 Library** (only for the optional BME280) | Adafruit |
 
    `DNSServer`, `Preferences`, `ESPmDNS`, `HTTPClient`, `WiFiClientSecure` and `Wire` ship with the ESP32 core.
 5. Install the LittleFS uploader plugin for Arduino IDE 2.x. Download the latest `.vsix` from [earlephilhower/arduino-littlefs-upload](https://github.com/earlephilhower/arduino-littlefs-upload/releases), place it in `~/.arduinoIDE/plugins/` (create the folder if needed) and restart the IDE.
@@ -176,6 +182,22 @@ To add them:
 - **Publish interval.** `MQTT_PUBLISH_INTERVAL_MS` sets how often readings go out (5000 ms by default).
 - **Dashboard link.** `MQTT_CONFIG_URL` is the link shown on the device page. Change it if you reach the board by IP.
 - **A second board.** The device ID comes from the MAC address, so a second board appears as a separate device. The entity IDs and names then need renaming in Home Assistant to tell them apart.
+
+## Optional: compare the DHT11 with a BME280
+
+If a BME280 breakout is wired as in the table above, the sketch finds it at address `0x76` or `0x77` at boot and the Serial Monitor prints `[bme280] found`. Home Assistant then shows three more entities under the same device:
+
+| Entity | Example ID | Notes |
+| --- | --- | --- |
+| BME280 temperature | `sensor.climate_monitor_bme280_temperature` | degrees C, two decimals |
+| BME280 humidity | `sensor.climate_monitor_bme280_humidity` | percent |
+| BME280 pressure | `sensor.climate_monitor_bme280_pressure` | hPa, station pressure, not corrected to sea level |
+
+The BME280 runs in forced mode (one measurement per read) so it does not warm itself. The existing DHT11 entities and the fan automations are unchanged.
+
+To log a comparison, open Settings, History in Home Assistant, pick the sensors you want to compare (for example a separate room thermometer already in Home Assistant), choose the time range, then open the three-dot menu and select **Download data** for a CSV. `tools/compare_sensors.py` summarises such a file: offset, noise and error against a reference sensor. See `tools/README.md` in this folder.
+
+If the BME280 is not found the sketch carries on without it and the dashboard and Home Assistant link work as before.
 
 ## Why two thresholds
 
