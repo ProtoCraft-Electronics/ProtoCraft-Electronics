@@ -504,8 +504,15 @@ bool connectMqtt() {
     return false;
   }
   Serial.println("[mqtt] connected");
-  publishDiscovery("temperature", "Temperature", "temperature", "°C", "temperature", "", "");
-  publishDiscovery("humidity", "Humidity", "humidity", "%", "humidity", "", "");
+  // The DHT11 entities carry the sensor name, so they are easy to tell apart
+  // from the BME280 ones: sensor.climate_monitor_dht11_temperature and so on.
+  // Earlier firmware published them as plain "temperature" and "humidity".
+  // An empty retained message on those old topics tells Home Assistant to
+  // remove the old entities, so no stale duplicates are left behind.
+  mqtt.publish(("homeassistant/sensor/" + mqttDeviceId + "/temperature/config").c_str(), "", true);
+  mqtt.publish(("homeassistant/sensor/" + mqttDeviceId + "/humidity/config").c_str(), "", true);
+  publishDiscovery("dht11_temperature", "DHT11 temperature", "temperature", "°C", "temperature", "", "");
+  publishDiscovery("dht11_humidity", "DHT11 humidity", "humidity", "%", "humidity", "", "");
   publishDiscovery("comfort_score", "Comfort score", "", "", "comfort", "", "mdi:emoticon-happy-outline");
   publishDiscovery("wifi_signal", "WiFi signal", "signal_strength", "dBm", "rssi", "diagnostic", "");
 #if BME280_ENABLED

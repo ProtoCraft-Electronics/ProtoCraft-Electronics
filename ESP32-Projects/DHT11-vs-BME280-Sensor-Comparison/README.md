@@ -13,12 +13,13 @@ The firmware is the [DHT11 Climate Dashboard with Home Assistant](../DHT11-Clima
 5. [Set up the MQTT broker in Home Assistant](#set-up-the-mqtt-broker-in-home-assistant)
 6. [Configure and flash the board](#configure-and-flash-the-board)
 7. [Check the entities in Home Assistant](#check-the-entities-in-home-assistant)
-8. [Run a fair comparison](#run-a-fair-comparison)
-9. [Export the data from Home Assistant](#export-the-data-from-home-assistant)
-10. [Analyse the CSV](#analyse-the-csv)
-11. [Measure the effect of an enclosure](#measure-the-effect-of-an-enclosure)
-12. [Troubleshooting](#troubleshooting)
-13. [License](#license)
+8. [Update an existing fan automation](#update-an-existing-fan-automation)
+9. [Run a fair comparison](#run-a-fair-comparison)
+10. [Export the data from Home Assistant](#export-the-data-from-home-assistant)
+11. [Analyse the CSV](#analyse-the-csv)
+12. [Measure the effect of an enclosure](#measure-the-effect-of-an-enclosure)
+13. [Troubleshooting](#troubleshooting)
+14. [License](#license)
 
 ## What you get
 
@@ -26,15 +27,15 @@ The firmware is the [DHT11 Climate Dashboard with Home Assistant](../DHT11-Clima
 
 | Entity | Example ID | Source | Notes |
 | --- | --- | --- | --- |
-| Temperature | `sensor.climate_monitor_temperature` | DHT11 | whole degrees C |
-| Humidity | `sensor.climate_monitor_humidity` | DHT11 | percent |
+| DHT11 temperature | `sensor.climate_monitor_dht11_temperature` | DHT11 | whole degrees C |
+| DHT11 humidity | `sensor.climate_monitor_dht11_humidity` | DHT11 | percent |
 | BME280 temperature | `sensor.climate_monitor_bme280_temperature` | BME280 | degrees C, two decimals |
 | BME280 humidity | `sensor.climate_monitor_bme280_humidity` | BME280 | percent |
 | BME280 pressure | `sensor.climate_monitor_bme280_pressure` | BME280 | hPa, station pressure (not corrected to sea level) |
 | Comfort score | `sensor.climate_monitor_comfort_score` | DHT11 | 0 to 100, same as the dashboard |
 | WiFi signal | `sensor.climate_monitor_wifi_signal` | ESP32 | dBm, diagnostic |
 
-- The DHT11 entities keep the same IDs as in the Home Assistant project, so any automation that uses them keeps working.
+- The DHT11 entities carry the sensor name, so they are easy to tell apart from the BME280 ones. This changes their IDs from the Home Assistant project (`sensor.climate_monitor_temperature` becomes `sensor.climate_monitor_dht11_temperature`). Update any automation that uses the old ID. The firmware removes the old entities from Home Assistant by itself when it first connects.
 - The BME280 runs in forced mode: one measurement per read, then the chip sleeps. That keeps its self-heating negligible.
 - If no BME280 is found, the sketch carries on with the DHT11 only.
 - `tools/compare_sensors.py` compares any sensor against a reference from a Home Assistant CSV export.
@@ -124,6 +125,19 @@ In the Serial Monitor you should see, in order: `[wifi] connected`, `[bme280] fo
 2. All seven entities from the table above should show values and update every 5 seconds.
 3. The BME280 entities only appear when the BME280 was found at boot.
 
+## Update an existing fan automation
+
+If you use the automations from the Home Assistant project, change the sensor in the trigger of each one:
+
+```yaml
+triggers:
+  - trigger: numeric_state
+    entity_id: sensor.climate_monitor_dht11_temperature   # was sensor.climate_monitor_temperature
+    above: 27
+```
+
+In the Home Assistant editor, open the automation, click the trigger, and pick the new DHT11 temperature entity. Do the same for the second automation. You can also point the automations at the BME280 temperature, `sensor.climate_monitor_bme280_temperature`.
+
 ## Run a fair comparison
 
 The result is only as good as the setup. Use these rules for every run:
@@ -150,7 +164,7 @@ Home Assistant can export recorded history as a CSV from the browser. You need n
 1. Open **History** in the sidebar.
 2. Pick the entities to compare. Use **Choose area, device or entity** and add:
    - the reference temperature entity
-   - `sensor.climate_monitor_temperature` (DHT11)
+   - `sensor.climate_monitor_dht11_temperature` (DHT11)
    - `sensor.climate_monitor_bme280_temperature` (BME280)
 
    For humidity add the matching three humidity entities. You can select all six at once.
@@ -169,8 +183,8 @@ Notes:
 ```
 pip install pandas numpy
 python3 tools/compare_sensors.py history.csv --list
-python3 tools/compare_sensors.py history.csv --ref <reference temperature> --pairs "climate_monitor_temperature,bme280_temperature" --kind temperature --trim-hours 1
-python3 tools/compare_sensors.py history.csv --ref <reference humidity> --pairs "climate_monitor_humidity,bme280_humidity" --kind humidity --trim-hours 1
+python3 tools/compare_sensors.py history.csv --ref <reference temperature> --pairs "dht11_temperature,bme280_temperature" --kind temperature --trim-hours 1
+python3 tools/compare_sensors.py history.csv --ref <reference humidity> --pairs "dht11_humidity,bme280_humidity" --kind humidity --trim-hours 1
 ```
 
 Use `--list` first to see the entity names in your file. `--ref` and `--pairs` match on part of the entity name, so a short unique piece is enough. More options are in [`tools/README.md`](tools/README.md).
